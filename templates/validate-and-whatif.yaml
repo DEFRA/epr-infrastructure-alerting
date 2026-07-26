@@ -1,0 +1,49 @@
+parameters:
+  - name: adoEnvironment
+    type: string
+  - name: bicepParameters
+    type: string
+  - name: connectedServiceNameARM
+    type: string
+  - name: resourceGroupName
+    type: string
+
+steps:
+  - checkout: self
+
+  - task: AzureCLI@2
+    displayName: Show Azure Account context
+    inputs:
+      connectedServiceNameARM: ${{ parameters.connectedServiceNameARM }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        az account show
+
+  - task: AzureCLI@2
+    displayName: Validate ${{ parameters.adoEnvironment }} deployment
+    inputs:
+      connectedServiceNameARM: ${{ parameters.connectedServiceNameARM }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: shared-infra/alerting
+      inlineScript: |
+        az deployment group validate \
+          --mode Incremental \
+          --resource-group '${{ parameters.resourceGroupName }}' \
+          --template-file 'main.bicep' \
+          --parameters 'params/${{ parameters.bicepParameters }}'
+
+  - task: AzureCLI@2
+    displayName: What-if ${{ parameters.adoEnvironment }} deployment
+    inputs:
+      connectedServiceNameARM: ${{ parameters.connectedServiceNameARM }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: shared-infra/alerting
+      inlineScript: |
+        az deployment group what-if \
+          --mode Incremental \
+          --resource-group '${{ parameters.resourceGroupName }}' \
+          --template-file 'main.bicep' \
+          --parameters 'params/${{ parameters.bicepParameters }}'

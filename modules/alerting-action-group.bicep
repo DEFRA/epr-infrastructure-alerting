@@ -1,11 +1,12 @@
 param actionGroupName string
 param groupShortName string
-param workflowResourceId string
+param workflowResourceId string = ''
 
 @secure()
-param workflowCallbackUrl string
+param workflowCallbackUrl string = ''
 
 param emailReceivers array = []
+param webhookReceivers array = []
 param customTags object = {}
 
 resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
@@ -20,7 +21,7 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
       emailAddress: trim(email)
       useCommonAlertSchema: true
     }]
-    logicAppReceivers: [
+    logicAppReceivers: empty(workflowResourceId) ? [] : [
       {
         name: '${actionGroupName}Slack'
         resourceId: workflowResourceId
@@ -28,6 +29,11 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
         useCommonAlertSchema: true
       }
     ]
+    webhookReceivers: [for (webhook, i) in webhookReceivers: {
+      name: '${actionGroupName}Webhook${i}'
+      serviceUri: trim(webhook)
+      useCommonAlertSchema: true
+    }]
   }
 }
 

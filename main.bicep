@@ -1,44 +1,46 @@
-import { actionGroupChannelType, commonTags, slackChannelType } from './common.bicep'
+import { alertTeamType, commonTags } from './common.bicep'
 
-param actionGroupChannels actionGroupChannelType[] = []
+param teams alertTeamType[] = []
 param environmentNumber string
 param environmentType string
 param location string = resourceGroup().location
-param slackChannels slackChannelType[] = []
 @secure()
 param slackWebhookUrls object = {}
 
-module slackLogicApps './modules/slack-alerting-logic-app.bicep' = [for channel in slackChannels: {
+module slackLogicApps './modules/slack-alerting-logic-app.bicep' = [for team in teams: {
   params: {
-    workflowName: channel.workflowName
+    workflowName: team.slackWorkflowName
     location: location
-    slackWebhookUrl: slackWebhookUrls[channel.channelKey]
+    slackWebhookUrl: slackWebhookUrls[team.teamKey]
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: channel.channelKey
+      AlertChannel: team.teamKey
+      Team: team.teamKey
     })
   }
 }]
 
-var slackChannelKeys = [for channel in slackChannels: channel.channelKey]
+var slackTeamKeys = [for team in teams: team.teamKey]
 
-module alertActionGroups './modules/alerting-action-group.bicep' = [for channel in actionGroupChannels: {
+module alertActionGroups './modules/alerting-action-group.bicep' = [for team in teams: {
   params: {
-    actionGroupName: channel.actionGroupName
-    groupShortName: channel.groupShortName
-    workflowResourceId: slackLogicApps[indexOf(slackChannelKeys, channel.channelKey)].outputs.workflowResourceId
-    workflowCallbackUrl: slackLogicApps[indexOf(slackChannelKeys, channel.channelKey)].outputs.manualTriggerCallbackUrl
-    emailReceivers: channel.emailReceivers
+    actionGroupName: team.actionGroupName
+    groupShortName: team.groupShortName
+    workflowResourceId: slackLogicApps[indexOf(slackTeamKeys, team.teamKey)].outputs.workflowResourceId
+    workflowCallbackUrl: slackLogicApps[indexOf(slackTeamKeys, team.teamKey)].outputs.manualTriggerCallbackUrl
+    emailReceivers: team.emailReceivers
+    webhookReceivers: team.webhookReceivers
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: channel.channelKey
+      AlertChannel: team.teamKey
+      Team: team.teamKey
     })
   }
 }]
 
 // Action group IDs are safe to output - consumers reference these to attach alerts
-output channels array = [for (channel, i) in actionGroupChannels: {
-  channelKey: channel.channelKey
+output channels array = [for (team, i) in teams: {
+  teamKey: team.teamKey
   actionGroupId: alertActionGroups[i].outputs.actionGroupId
   actionGroupName: alertActionGroups[i].outputs.actionGroupName
 }]

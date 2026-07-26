@@ -1,0 +1,38 @@
+parameters:
+  - name: jobName
+    type: string
+  - name: adoEnvironment
+    type: string
+  - name: bicepParameters
+    type: string
+  - name: connectedServiceNameARM
+    type: string
+  - name: deploymentName
+    type: string
+  - name: resourceGroupName
+    type: string
+
+jobs:
+  - deployment: ${{ parameters.jobName }}
+    displayName: Deploy to ${{ parameters.deploymentName }}
+    environment: ${{ parameters.adoEnvironment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - checkout: self
+
+            - task: AzureCLI@2
+              displayName: Deploy resources
+              inputs:
+                connectedServiceNameARM: ${{ parameters.connectedServiceNameARM }}
+                scriptType: bash
+                scriptLocation: inlineScript
+                workingDirectory: shared-infra/alerting
+                inlineScript: |
+                  az deployment group create \
+                    --mode Incremental \
+                    --name 'alerting-${{ parameters.deploymentName }}-$(Build.BuildId)' \
+                    --resource-group '${{ parameters.resourceGroupName }}' \
+                    --template-file 'main.bicep' \
+                    --parameters 'params/${{ parameters.bicepParameters }}'

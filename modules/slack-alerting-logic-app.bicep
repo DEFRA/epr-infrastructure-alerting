@@ -252,6 +252,10 @@ resource slackAlertWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
                           type: 'mrkdwn'
                           text: '*Severity*\n@{outputs(\'Get_Severity\')}'
                         }
+                        {
+                          type: 'mrkdwn'
+                          text: '*Alert Link*\n@{if(equals(outputs(\'Get_InvestigationLink\'), \'N-A\'), \'N-A\', concat(\'<\', outputs(\'Get_InvestigationLink\'), \'|Open in Azure Monitor>\'))}'
+                        }
                       ]
                     }
                   ]

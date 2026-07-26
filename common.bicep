@@ -9,21 +9,17 @@ var commonTags = {
 }
 
 @export()
-type slackChannelType = {
-  @description('Unique key used to look up the webhook URL at deploy time')
-  channelKey: string
-  @description('Name of the Logic App workflow resource')
-  workflowName: string
-}
-
-@export()
-type actionGroupChannelType = {
-  @description('Unique key used to bind this Action Group to a Slack workflow channel')
-  channelKey: string
+type alertTeamType = {
+  @description('Unique key for the team')
+  teamKey: string
   @description('Name of the Action Group resource')
   actionGroupName: string
   @description('Short name for the Action Group (max 12 chars)')
   groupShortName: string
+  @description('Name of the Logic App workflow resource for Slack notifications; leave empty for email-only teams')
+  slackWorkflowName: string
   @description('Optional list of email addresses to include in the Action Group')
   emailReceivers: string[]
+  @description('Optional list of webhook endpoints to include in the Action Group')
+  webhookReceivers: string[]
 }

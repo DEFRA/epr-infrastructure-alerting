@@ -3,31 +3,24 @@ using '../main.bicep'
 param environmentType = 'DEV'
 param environmentNumber = '1'
 
-param slackChannels = [
+param teams = [
   {
-    channelKey: 'platformTeam'
-    workflowName: 'SlackChannel-PlatformTeam'
-  }
-  {
-    channelKey: 'regulatorTeam'
-    workflowName: 'SlackChannel-RegulatorTeam'
-  }
-]
-
-param actionGroupChannels = [
-  {
-    channelKey: 'platformTeam'
+    teamKey: 'platformTeam'
     actionGroupName: 'ActionGroup-PlatformTeam'
     groupShortName: 'AGPlatform'
+    slackWorkflowName: 'SlackChannel-PlatformTeam'
     emailReceivers: [
       'paul.barnard@esynergy.co.uk'
     ]
+    webhookReceivers: []
   }
   {
-    channelKey: 'regulatorTeam'
+    teamKey: 'regulatorTeam'
     actionGroupName: 'ActionGroup-RegulatorTeam'
     groupShortName: 'AGRegulator'
+    slackWorkflowName: 'SlackChannel-RegulatorTeam'
     emailReceivers: []
+    webhookReceivers: []
   }
 ]
 

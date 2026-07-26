@@ -1,0 +1,614 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.45.15.27210",
+      "templateHash": "13192203993904860188"
+    }
+  },
+  "definitions": {
+    "alertTeamType": {
+      "type": "object",
+      "properties": {
+        "teamKey": {
+          "type": "string",
+          "metadata": {
+            "description": "Unique key for the team"
+          }
+        },
+        "actionGroupName": {
+          "type": "string",
+          "metadata": {
+            "description": "Name of the Action Group resource"
+          }
+        },
+        "groupShortName": {
+          "type": "string",
+          "metadata": {
+            "description": "Short name for the Action Group (max 12 chars)"
+          }
+        },
+        "slackWorkflowName": {
+          "type": "string",
+          "metadata": {
+            "description": "Name of the Logic App workflow resource for Slack notifications; leave empty for email-only teams"
+          }
+        },
+        "emailReceivers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "metadata": {
+            "description": "Optional list of email addresses to include in the Action Group"
+          }
+        },
+        "webhookReceivers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "metadata": {
+            "description": "Optional list of webhook endpoints to include in the Action Group"
+          }
+        }
+      },
+      "metadata": {
+        "__bicep_imported_from!": {
+          "sourceTemplate": "common.bicep"
+        }
+      }
+    }
+  },
+  "parameters": {
+    "teams": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/alertTeamType"
+      },
+      "defaultValue": []
+    },
+    "environmentNumber": {
+      "type": "string"
+    },
+    "environmentType": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "slackWebhookUrls": {
+      "type": "secureObject",
+      "defaultValue": {}
+    }
+  },
+  "variables": {
+    "copy": [
+      {
+        "name": "slackTeamKeys",
+        "count": "[length(parameters('teams'))]",
+        "input": "[parameters('teams')[copyIndex('slackTeamKeys')].teamKey]"
+      }
+    ],
+    "commonTags": {
+      "ManagedBy": "Bicep",
+      "Owner": "Platform Team",
+      "Purpose": "SHARED-ALERTING",
+      "Repo": "ccoe-epr-infrastructure",
+      "ServiceCode": "RWD",
+      "Tier": "SHARED"
+    }
+  },
+  "resources": {
+    "slackLogicApps": {
+      "copy": {
+        "name": "slackLogicApps",
+        "count": "[length(parameters('teams'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('slackLogicApps-{0}-{1}', copyIndex(), uniqueString('slackLogicApps', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "workflowName": {
+            "value": "[parameters('teams')[copyIndex()].slackWorkflowName]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "slackWebhookUrl": {
+            "value": "[parameters('slackWebhookUrls')[parameters('teams')[copyIndex()].teamKey]]"
+          },
+          "customTags": {
+            "value": "[union(variables('commonTags'), createObject('Environment', format('{0}{1}', parameters('environmentType'), parameters('environmentNumber')), 'AlertChannel', parameters('teams')[copyIndex()].teamKey, 'Team', parameters('teams')[copyIndex()].teamKey))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.45.15.27210",
+              "templateHash": "9251548316553695592"
+            }
+          },
+          "parameters": {
+            "workflowName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "slackWebhookUrl": {
+              "type": "securestring"
+            },
+            "customTags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Logic/workflows",
+              "apiVersion": "2019-05-01",
+              "name": "[parameters('workflowName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('customTags')]",
+              "properties": {
+                "state": "Enabled",
+                "definition": {
+                  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                  "contentVersion": "1.0.0.0",
+                  "parameters": {
+                    "slackWebhookUrl": {
+                      "type": "SecureString"
+                    }
+                  },
+                  "triggers": {
+                    "manual": {
+                      "type": "Request",
+                      "kind": "Http",
+                      "inputs": {
+                        "schema": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  },
+                  "actions": {
+                    "Get_Rule": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['essentials']?['alertRule'], triggerBody()?['data']?['operationName'], triggerBody()?['eventType'], 'Key Vault lifecycle alert')}",
+                      "runAfter": {}
+                    },
+                    "Get_Rule_Display": {
+                      "type": "Compose",
+                      "inputs": "@{if(contains(outputs('Get_Rule'), '-'), last(split(outputs('Get_Rule'), '-')), outputs('Get_Rule'))}",
+                      "runAfter": {
+                        "Get_Rule": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Rule_Label": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['essentials']?['alertRule'], 'Alert')}",
+                      "runAfter": {
+                        "Get_Rule_Display": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Type": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['alertContext']?['event']?['type'], triggerBody()?['data']?['alertContext']?['eventType'], triggerBody()?['data']?['alertContext']?['properties']?['eventType'], triggerBody()?['data']?['essentials']?['monitoringService'], triggerBody()?['data']?['alertContext']?['conditionType'], 'Monitor')}",
+                      "runAfter": {}
+                    },
+                    "Get_Type_Display": {
+                      "type": "Compose",
+                      "inputs": "@{if(contains(outputs('Get_Type'), '.'), last(split(outputs('Get_Type'), '.')), outputs('Get_Type'))}",
+                      "runAfter": {
+                        "Get_Type": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Type_Label": {
+                      "type": "Compose",
+                      "inputs": "@{if(equals(outputs('Get_Type_Display'), 'SecretNewVersionCreated'), 'New KeyVault Secret Created', if(equals(outputs('Get_Type_Display'), 'SecretExpired'), 'KeyVault Secret Expired', if(equals(outputs('Get_Type_Display'), 'SecretNearExpiry'), 'KeyVault Secret Expiring Soon', if(equals(outputs('Get_Type_Display'), 'CertificateNewVersionCreated'), 'New Certificate Created', if(equals(outputs('Get_Type_Display'), 'CertificateExpired'), 'Certificate Expired', if(equals(outputs('Get_Type_Display'), 'CertificateNearExpiry'), 'Certificate Expiring Soon', outputs('Get_Type_Display')))))))}",
+                      "runAfter": {
+                        "Get_Type_Display": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Subject_Raw": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['essentials']?['description'], 'No description')}",
+                      "runAfter": {}
+                    },
+                    "Get_Subject": {
+                      "type": "Compose",
+                      "inputs": "@{if(greater(length(outputs('Get_Subject_Raw')), 80), concat(substring(outputs('Get_Subject_Raw'), 0, 77), '...'), outputs('Get_Subject_Raw'))}",
+                      "runAfter": {
+                        "Get_Subject_Raw": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Severity": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['essentials']?['severity'], 'Info')}",
+                      "runAfter": {}
+                    },
+                    "Get_Severity_Icon": {
+                      "type": "Compose",
+                      "inputs": "@{if(or(equals(outputs('Get_Severity'), 'Sev0'), equals(outputs('Get_Severity'), 'Sev1')), '🚨', if(equals(outputs('Get_Severity'), 'Sev2'), '⚠️', if(equals(outputs('Get_Severity'), 'Sev3'), 'ℹ️', '🔔')))}",
+                      "runAfter": {
+                        "Get_Severity": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Severity_Color": {
+                      "type": "Compose",
+                      "inputs": "@{if(or(equals(outputs('Get_Severity'), 'Sev0'), equals(outputs('Get_Severity'), 'Sev1')), 'danger', if(equals(outputs('Get_Severity'), 'Sev2'), 'warning', 'good'))}",
+                      "runAfter": {
+                        "Get_Severity": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Resource": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['alertContext']?['event']?['source'], triggerBody()?['data']?['essentials']?['alertTargetIDs']?[0], 'N-A')}",
+                      "runAfter": {}
+                    },
+                    "Get_Resource_Display": {
+                      "type": "Compose",
+                      "inputs": "@{if(contains(outputs('Get_Resource'), '/'), last(split(outputs('Get_Resource'), '/')), outputs('Get_Resource'))}",
+                      "runAfter": {
+                        "Get_Resource": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Time": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['alertContext']?['event']?['time'], triggerBody()?['data']?['essentials']?['firedDateTime'], utcNow())}",
+                      "runAfter": {}
+                    },
+                    "Get_Time_Display": {
+                      "type": "Compose",
+                      "inputs": "@{concat(formatDateTime(outputs('Get_Time'), 'yyyy-MM-dd HH:mm:ss'), ' UTC')}",
+                      "runAfter": {
+                        "Get_Time": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_InvestigationLink": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['essentials']?['investigationLink'], 'N-A')}",
+                      "runAfter": {}
+                    },
+                    "Get_ObjectName": {
+                      "type": "Compose",
+                      "inputs": "@{coalesce(triggerBody()?['data']?['alertContext']?['event']?['data']?['ObjectName'], triggerBody()?['data']?['alertContext']?['event']?['subject'], 'Item')}",
+                      "runAfter": {}
+                    },
+                    "Build_Slack_Message": {
+                      "type": "Compose",
+                      "inputs": "@{concat('*Key Vault Alert*', '\\n*Rule:* ', outputs('Get_Rule_Label'), '\\n*Type:* ', outputs('Get_Type_Display'), '\\n*Subject:* ', outputs('Get_Subject'), '\\n*Resource:* ', outputs('Get_Resource_Display'), '\\n*Time:* ', outputs('Get_Time_Display'), '\\n*Severity:* ', outputs('Get_Severity'))}",
+                      "runAfter": {
+                        "Get_Rule": [
+                          "Succeeded"
+                        ],
+                        "Get_Rule_Display": [
+                          "Succeeded"
+                        ],
+                        "Get_Rule_Label": [
+                          "Succeeded"
+                        ],
+                        "Get_Type": [
+                          "Succeeded"
+                        ],
+                        "Get_Type_Display": [
+                          "Succeeded"
+                        ],
+                        "Get_Subject_Raw": [
+                          "Succeeded"
+                        ],
+                        "Get_Subject": [
+                          "Succeeded"
+                        ],
+                        "Get_Severity": [
+                          "Succeeded"
+                        ],
+                        "Get_Severity_Icon": [
+                          "Succeeded"
+                        ],
+                        "Get_Resource": [
+                          "Succeeded"
+                        ],
+                        "Get_Resource_Display": [
+                          "Succeeded"
+                        ],
+                        "Get_Time": [
+                          "Succeeded"
+                        ],
+                        "Get_Time_Display": [
+                          "Succeeded"
+                        ],
+                        "Get_InvestigationLink": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Post_To_Slack": {
+                      "type": "Http",
+                      "inputs": {
+                        "method": "POST",
+                        "uri": "@parameters('slackWebhookUrl')",
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "text": " ",
+                          "attachments": [
+                            {
+                              "color": "@{outputs('Get_Severity_Color')}",
+                              "blocks": [
+                                {
+                                  "type": "header",
+                                  "text": {
+                                    "type": "plain_text",
+                                    "text": "@{concat(outputs('Get_Severity_Icon'), ' ', outputs('Get_Type_Label'))}",
+                                    "emoji": true
+                                  }
+                                },
+                                {
+                                  "type": "section",
+                                  "fields": [
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Rule*\n@{outputs('Get_Rule_Label')}"
+                                    },
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Type*\n`@{outputs('Get_Type_Display')}`"
+                                    },
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Item*\n@{outputs('Get_ObjectName')}"
+                                    },
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Subject*\n@{outputs('Get_Subject')}"
+                                    },
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Resource*\n@{outputs('Get_Resource_Display')}"
+                                    },
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Time*\n@{outputs('Get_Time_Display')}"
+                                    },
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Severity*\n@{outputs('Get_Severity')}"
+                                    },
+                                    {
+                                      "type": "mrkdwn",
+                                      "text": "*Alert Link*\n@{if(equals(outputs('Get_InvestigationLink'), 'N-A'), 'N-A', concat('<', outputs('Get_InvestigationLink'), '|Open in Azure Monitor>'))}"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "runAfter": {
+                        "Build_Slack_Message": [
+                          "Succeeded"
+                        ],
+                        "Get_Severity_Icon": [
+                          "Succeeded"
+                        ],
+                        "Get_Severity_Color": [
+                          "Succeeded"
+                        ],
+                        "Get_Rule_Display": [
+                          "Succeeded"
+                        ],
+                        "Get_Rule_Label": [
+                          "Succeeded"
+                        ],
+                        "Get_Type_Label": [
+                          "Succeeded"
+                        ],
+                        "Get_Resource_Display": [
+                          "Succeeded"
+                        ],
+                        "Get_Time_Display": [
+                          "Succeeded"
+                        ],
+                        "Get_ObjectName": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "outputs": {}
+                },
+                "parameters": {
+                  "slackWebhookUrl": {
+                    "value": "[parameters('slackWebhookUrl')]"
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "workflowResourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Logic/workflows', parameters('workflowName'))]"
+            },
+            "manualTriggerCallbackUrl": {
+              "type": "string",
+              "value": "[listCallbackUrl(resourceId('Microsoft.Logic/workflows/triggers', parameters('workflowName'), 'manual'), '2019-05-01').value]"
+            }
+          }
+        }
+      }
+    },
+    "alertActionGroups": {
+      "copy": {
+        "name": "alertActionGroups",
+        "count": "[length(parameters('teams'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('alertActionGroups-{0}-{1}', copyIndex(), uniqueString('alertActionGroups', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "actionGroupName": {
+            "value": "[parameters('teams')[copyIndex()].actionGroupName]"
+          },
+          "groupShortName": {
+            "value": "[parameters('teams')[copyIndex()].groupShortName]"
+          },
+          "workflowResourceId": {
+            "value": "[reference(format('slackLogicApps[{0}]', indexOf(variables('slackTeamKeys'), parameters('teams')[copyIndex()].teamKey))).outputs.workflowResourceId.value]"
+          },
+          "workflowCallbackUrl": {
+            "value": "[reference(format('slackLogicApps[{0}]', indexOf(variables('slackTeamKeys'), parameters('teams')[copyIndex()].teamKey))).outputs.manualTriggerCallbackUrl.value]"
+          },
+          "emailReceivers": {
+            "value": "[parameters('teams')[copyIndex()].emailReceivers]"
+          },
+          "webhookReceivers": {
+            "value": "[parameters('teams')[copyIndex()].webhookReceivers]"
+          },
+          "customTags": {
+            "value": "[union(variables('commonTags'), createObject('Environment', format('{0}{1}', parameters('environmentType'), parameters('environmentNumber')), 'AlertChannel', parameters('teams')[copyIndex()].teamKey, 'Team', parameters('teams')[copyIndex()].teamKey))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.45.15.27210",
+              "templateHash": "1723348803302128341"
+            }
+          },
+          "parameters": {
+            "actionGroupName": {
+              "type": "string"
+            },
+            "groupShortName": {
+              "type": "string"
+            },
+            "workflowResourceId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "workflowCallbackUrl": {
+              "type": "securestring",
+              "defaultValue": ""
+            },
+            "emailReceivers": {
+              "type": "array",
+              "defaultValue": []
+            },
+            "webhookReceivers": {
+              "type": "array",
+              "defaultValue": []
+            },
+            "customTags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/actionGroups",
+              "apiVersion": "2023-01-01",
+              "name": "[parameters('actionGroupName')]",
+              "location": "global",
+              "tags": "[parameters('customTags')]",
+              "properties": {
+                "copy": [
+                  {
+                    "name": "emailReceivers",
+                    "count": "[length(parameters('emailReceivers'))]",
+                    "input": {
+                      "name": "[format('{0}Email{1}', parameters('actionGroupName'), copyIndex('emailReceivers'))]",
+                      "emailAddress": "[trim(parameters('emailReceivers')[copyIndex('emailReceivers')])]",
+                      "useCommonAlertSchema": true
+                    }
+                  },
+                  {
+                    "name": "webhookReceivers",
+                    "count": "[length(parameters('webhookReceivers'))]",
+                    "input": {
+                      "name": "[format('{0}Webhook{1}', parameters('actionGroupName'), copyIndex('webhookReceivers'))]",
+                      "serviceUri": "[trim(parameters('webhookReceivers')[copyIndex('webhookReceivers')])]",
+                      "useCommonAlertSchema": true
+                    }
+                  }
+                ],
+                "enabled": true,
+                "groupShortName": "[parameters('groupShortName')]",
+                "logicAppReceivers": "[if(empty(parameters('workflowResourceId')), createArray(), createArray(createObject('name', format('{0}Slack', parameters('actionGroupName')), 'resourceId', parameters('workflowResourceId'), 'callbackUrl', parameters('workflowCallbackUrl'), 'useCommonAlertSchema', true())))]"
+              }
+            }
+          ],
+          "outputs": {
+            "actionGroupId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/actionGroups', parameters('actionGroupName'))]"
+            },
+            "actionGroupName": {
+              "type": "string",
+              "value": "[parameters('actionGroupName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[format('slackLogicApps[{0}]', indexOf(variables('slackTeamKeys'), parameters('teams')[copyIndex()].teamKey))]",
+        "[format('slackLogicApps[{0}]', indexOf(variables('slackTeamKeys'), parameters('teams')[copyIndex()].teamKey))]"
+      ]
+    }
+  },
+  "outputs": {
+    "channels": {
+      "type": "array",
+      "copy": {
+        "count": "[length(parameters('teams'))]",
+        "input": {
+          "teamKey": "[parameters('teams')[copyIndex()].teamKey]",
+          "actionGroupId": "[reference(format('alertActionGroups[{0}]', copyIndex())).outputs.actionGroupId.value]",
+          "actionGroupName": "[reference(format('alertActionGroups[{0}]', copyIndex())).outputs.actionGroupName.value]"
+        }
+      }
+    }
+  }
+}
