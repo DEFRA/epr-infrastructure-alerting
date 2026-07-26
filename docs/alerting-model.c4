@@ -1,0 +1,87 @@
+specification {
+  element person
+  element system
+  element container
+  element component
+}
+
+model {
+  platformTeam = person "Platform Team" {
+    description "Owns shared alerting pipeline and infrastructure code"
+  }
+
+  eprTeams = person "EPR Product Teams" {
+    description "Own team alert definitions and notification configuration"
+  }
+
+  azureDevOps = system "Azure DevOps" {
+    description "Runs validate, what-if, and deploy stages"
+  }
+
+  azureMonitor = system "Azure Monitor" {
+    description "Fires monitor alerts"
+  }
+
+  slackWorkspace = system "Defra Digital Team Slack Workspace" {
+    description "Receives Slack notifications"
+  }
+
+  sharedAlerting = system "Shared Alerting Platform" {
+    description "Bicep-defined multi-team alert notification facility"
+
+    pipeline = container "Alerting Pipeline" {
+      technology "Azure Pipelines"
+      description "Validate/What-If/Deploy for shared-infra/alerting"
+    }
+
+    alertingConfig = container "Alerting Team Config" {
+      technology "Bicep Params"
+      description "teams[] and slackWebhookUrls"
+    }
+
+    actionGroups = container "Alert Action Groups" {
+      technology "Microsoft.Insights/actionGroups"
+      description "One action group per team with multiple receiver types"
+    }
+
+    slackLogicApps = container "Slack Logic Apps" {
+      technology "Microsoft.Logic/workflows"
+      description "Formats and posts alert messages to Slack"
+    }
+
+    emailReceiver = component "Email Receiver" {
+      technology "Action Group emailReceivers"
+      description "Optional team email notifications"
+    }
+
+    webhookReceiver = component "Webhook Receiver" {
+      technology "Action Group webhookReceivers"
+      description "Optional non-Slack webhook notifications"
+    }
+  }
+
+  platformTeam -> pipeline "Maintains"
+  eprTeams -> alertingConfig "Contributes configuration to"
+  pipeline -> alertingConfig "Reads"
+  pipeline -> actionGroups "Deploys"
+  pipeline -> slackLogicApps "Deploys"
+
+  azureMonitor -> actionGroups "Triggers via monitor alert"
+  actionGroups -> slackLogicApps "Invokes Logic App receiver"
+  slackLogicApps -> slackWorkspace "Posts message via incoming webhook"
+
+  actionGroups -> emailReceiver "Sends optional email notifications"
+  actionGroups -> webhookReceiver "Sends optional webhook notifications"
+}
+
+views {
+  view alerting-context {
+    title "Shared Alerting Platform - Context"
+    include *
+  }
+
+  view alerting-containers of sharedAlerting {
+    title "Shared Alerting Platform - Containers"
+    include *
+  }
+}

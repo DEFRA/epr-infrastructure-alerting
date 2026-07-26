@@ -1,0 +1,12 @@
+{
+  "name": "alerting-docs-likec4",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local LikeC4 runner for shared-infra alerting docs",
+  "scripts": {
+    "dev": "npx --yes likec4 start . --host 127.0.0.1 --port 5173",
+    "validate": "npx --yes likec4 validate --json --no-layout --file alerting-model.c4 .",
+    "build": "npx --yes likec4 build .",
+    "preview": "npx --yes likec4 preview ."
+  }
+}
