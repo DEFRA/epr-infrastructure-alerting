@@ -151,9 +151,18 @@ resource slackAlertWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
           inputs: '@{coalesce(triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'data\']?[\'ObjectName\'], triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'subject\'], \'Item\')}'
           runAfter: {}
         }
+        Get_Item_Display: {
+          type: 'Compose'
+          inputs: '@{if(equals(outputs(\'Get_ObjectName\'), \'Item\'), coalesce(triggerBody()?[\'data\']?[\'essentials\']?[\'configurationItems\']?[0], triggerBody()?[\'data\']?[\'alertContext\']?[\'properties\']?[\'title\'], outputs(\'Get_Type_Display\')), outputs(\'Get_ObjectName\'))}'
+          runAfter: {
+            Get_ObjectName: [
+              'Succeeded'
+            ]
+          }
+        }
         Build_Slack_Message: {
           type: 'Compose'
-          inputs: '@{concat(\'*Key Vault Alert*\', \'\\n*Rule:* \', outputs(\'Get_Rule_Label\'), \'\\n*Type:* \', outputs(\'Get_Type_Display\'), \'\\n*Subject:* \', outputs(\'Get_Subject\'), \'\\n*Resource:* \', outputs(\'Get_Resource_Display\'), \'\\n*Time:* \', outputs(\'Get_Time_Display\'), \'\\n*Severity:* \', outputs(\'Get_Severity\'))}'
+          inputs: '@{concat(\'*Monitor Alert*\', \'\\n*Rule:* \', outputs(\'Get_Rule_Label\'), \'\\n*Type:* \', outputs(\'Get_Type_Display\'), \'\\n*Subject:* \', outputs(\'Get_Subject\'), \'\\n*Resource:* \', outputs(\'Get_Resource_Display\'), \'\\n*Time:* \', outputs(\'Get_Time_Display\'), \'\\n*Severity:* \', outputs(\'Get_Severity\'))}'
           runAfter: {
             Get_Rule: [
               'Succeeded'
@@ -234,7 +243,7 @@ resource slackAlertWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
                         }
                         {
                           type: 'mrkdwn'
-                          text: '*Item*\n@{outputs(\'Get_ObjectName\')}'
+                          text: '*Context*\n@{outputs(\'Get_Item_Display\')}'
                         }
                         {
                           type: 'mrkdwn'
@@ -288,7 +297,7 @@ resource slackAlertWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             Get_Time_Display: [
               'Succeeded'
             ]
-            Get_ObjectName: [
+            Get_Item_Display: [
               'Succeeded'
             ]
           }

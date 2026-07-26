@@ -75,13 +75,13 @@ model {
 }
 
 views {
-  view alerting-context {
-    title "Shared Alerting Platform - Context"
-    include *
-  }
-
-  view alerting-containers of sharedAlerting {
-    title "Shared Alerting Platform - Containers"
-    include *
+  view index {
+    title "Alert Runtime Path"
+    include azureMonitor
+    include sharedAlerting.actionGroups
+    include sharedAlerting.slackLogicApps
+    include sharedAlerting.emailReceiver
+    include sharedAlerting.webhookReceiver
+    include slackWorkspace
   }
 }
