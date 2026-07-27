@@ -21,8 +21,17 @@ model {
   azurePlatform = system "Azure Internal Platform" {
     description "Azure-hosted alert sources and shared alerting resources"
 
-    azureMonitor = system "Azure Monitor" {
-      description "Fires monitor alerts"
+    azureMonitorEvaluation = system "Azure Monitor Evaluation" {
+      description "Azure Monitor metric evaluation resources for health alerts"
+
+      azureMonitor = system "Azure Monitor" {
+        description "Fires monitor alerts"
+      }
+
+      healthCheckMetricAlert = system "HealthCheck Metric Alert Rule" {
+        technology "Microsoft.Insights/metricAlerts"
+        description "Evaluates HealthCheckStatus and fires when below threshold"
+      }
     }
 
     keyVault = system "Azure Key Vault" {
@@ -31,6 +40,20 @@ model {
 
     functionAppHealth = system "Function App Health Check" {
       description "Emits HealthCheckStatus metrics"
+    }
+
+    eventGrid = system "Azure Event Grid" {
+      description "Routes Key Vault events to Azure Monitor"
+
+      keyVaultSystemTopic = container "Key Vault System Topic" {
+        technology "Microsoft.EventGrid/systemTopics"
+        description "System topic bound to Key Vault event source"
+      }
+
+      keyVaultExpirySubscription = container "Key Vault Expiry Event Subscription" {
+        technology "Microsoft.EventGrid/systemTopics/eventSubscriptions"
+        description "Filters SecretNearExpiry and forwards to MonitorAlert"
+      }
     }
 
     sharedAlerting = system "Shared Alerting Platform" {
@@ -82,9 +105,12 @@ model {
   pipeline -> actionGroups "Deploys"
   pipeline -> slackLogicApps "Deploys"
 
-  keyVault -> azureMonitor "Secret expiry events"
-  functionAppHealth -> azureMonitor "HealthCheckStatus metric samples"
-  azureMonitor -> actionGroups "Triggers via monitor alert"
+  keyVault -> keyVaultSystemTopic "Publishes SecretNearExpiry events"
+  keyVaultSystemTopic -> keyVaultExpirySubscription "Routes matching events"
+  keyVaultExpirySubscription -> azureMonitorEvaluation.azureMonitor "Delivers MonitorAlert events"
+  azureMonitorEvaluation.azureMonitor -> actionGroups "Triggers via monitor alert"
+  functionAppHealth -> azureMonitorEvaluation.healthCheckMetricAlert "Publishes health metrics"
+  azureMonitorEvaluation.healthCheckMetricAlert -> actionGroups "Triggers via monitor alert"
   actionGroups -> slackLogicApps "Invokes Logic App receiver"
   slackLogicApps -> slackWorkspace "Posts message via incoming webhook"
 
@@ -99,12 +125,47 @@ views {
     include externalAlerting
     include keyVault
     include functionAppHealth
-    include azureMonitor
+    include eventGrid
+    include eventGrid.keyVaultSystemTopic
+    include eventGrid.keyVaultExpirySubscription
+    include azureMonitorEvaluation
+    include azureMonitorEvaluation.azureMonitor
+    include azureMonitorEvaluation.healthCheckMetricAlert
     include sharedAlerting.actionGroups
     include sharedAlerting.slackLogicApps
     include sharedAlerting.emailReceiver
     include sharedAlerting.webhookReceiver
     include slackWorkspace
+
+    include keyVault -> keyVaultSystemTopic with {
+      color green
+      line solid
+    }
+
+    include keyVaultSystemTopic -> keyVaultExpirySubscription with {
+      color green
+      line solid
+    }
+
+    include keyVaultExpirySubscription -> azureMonitorEvaluation.azureMonitor with {
+      color green
+      line solid
+    }
+
+    include azureMonitorEvaluation.azureMonitor -> actionGroups with {
+      color green
+      line solid
+    }
+
+    include functionAppHealth -> azureMonitorEvaluation.healthCheckMetricAlert with {
+      color red
+      line solid
+    }
+
+    include azureMonitorEvaluation.healthCheckMetricAlert -> actionGroups with {
+      color red
+      line solid
+    }
 
     style azurePlatform {
       color indigo
@@ -118,8 +179,18 @@ views {
       border solid
     }
 
-    style azureMonitor {
+    style azureMonitorEvaluation {
       color primary
+      opacity 12%
+      border solid
+    }
+
+    style azureMonitorEvaluation.azureMonitor {
+      color primary
+    }
+
+    style azureMonitorEvaluation.healthCheckMetricAlert {
+      color red
     }
 
     style keyVault {
@@ -128,6 +199,20 @@ views {
 
     style functionAppHealth {
       color red
+    }
+
+    style eventGrid {
+      color secondary
+      opacity 12%
+      border solid
+    }
+
+    style eventGrid.keyVaultSystemTopic {
+      color indigo
+    }
+
+    style eventGrid.keyVaultExpirySubscription {
+      color amber
     }
 
     style sharedAlerting.actionGroups {
