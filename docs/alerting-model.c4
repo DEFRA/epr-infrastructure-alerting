@@ -18,45 +18,61 @@ model {
     description "Runs validate, what-if, and deploy stages"
   }
 
-  azureMonitor = system "Azure Monitor" {
-    description "Fires monitor alerts"
+  azurePlatform = system "Azure Internal Platform" {
+    description "Azure-hosted alert sources and shared alerting resources"
+
+    azureMonitor = system "Azure Monitor" {
+      description "Fires monitor alerts"
+    }
+
+    keyVault = system "Azure Key Vault" {
+      description "Emits secret near-expiry events"
+    }
+
+    functionAppHealth = system "Function App Health Check" {
+      description "Emits HealthCheckStatus metrics"
+    }
+
+    sharedAlerting = system "Shared Alerting Platform" {
+      description "Bicep-defined multi-team alert notification facility"
+
+      pipeline = container "Alerting Pipeline" {
+        technology "Azure Pipelines"
+        description "Validate/What-If/Deploy for shared-infra/alerting"
+      }
+
+      alertingConfig = container "Alerting Team Config" {
+        technology "Bicep Params"
+        description "teams[] and slackWebhookUrls"
+      }
+
+      actionGroups = container "Alert Action Groups" {
+        technology "Microsoft.Insights/actionGroups"
+        description "One action group per team with multiple receiver types"
+      }
+
+      slackLogicApps = container "Slack Logic Apps" {
+        technology "Microsoft.Logic/workflows"
+        description "Formats and posts alert messages to Slack"
+      }
+
+      emailReceiver = component "Email Receiver" {
+        technology "Action Group emailReceivers"
+        description "Optional team email notifications"
+      }
+
+      webhookReceiver = component "Webhook Receiver" {
+        technology "Action Group webhookReceivers"
+        description "Optional non-Slack webhook notifications"
+      }
+    }
   }
 
-  slackWorkspace = system "Defra Digital Team Slack Workspace" {
-    description "Receives Slack notifications"
-  }
+  externalAlerting = system "External SaaS Alerting" {
+    description "Third-party notification platforms outside Azure"
 
-  sharedAlerting = system "Shared Alerting Platform" {
-    description "Bicep-defined multi-team alert notification facility"
-
-    pipeline = container "Alerting Pipeline" {
-      technology "Azure Pipelines"
-      description "Validate/What-If/Deploy for shared-infra/alerting"
-    }
-
-    alertingConfig = container "Alerting Team Config" {
-      technology "Bicep Params"
-      description "teams[] and slackWebhookUrls"
-    }
-
-    actionGroups = container "Alert Action Groups" {
-      technology "Microsoft.Insights/actionGroups"
-      description "One action group per team with multiple receiver types"
-    }
-
-    slackLogicApps = container "Slack Logic Apps" {
-      technology "Microsoft.Logic/workflows"
-      description "Formats and posts alert messages to Slack"
-    }
-
-    emailReceiver = component "Email Receiver" {
-      technology "Action Group emailReceivers"
-      description "Optional team email notifications"
-    }
-
-    webhookReceiver = component "Webhook Receiver" {
-      technology "Action Group webhookReceivers"
-      description "Optional non-Slack webhook notifications"
+    slackWorkspace = system "Defra Digital Team Slack Workspace" {
+      description "Receives Slack notifications"
     }
   }
 
@@ -66,6 +82,8 @@ model {
   pipeline -> actionGroups "Deploys"
   pipeline -> slackLogicApps "Deploys"
 
+  keyVault -> azureMonitor "Secret expiry events"
+  functionAppHealth -> azureMonitor "HealthCheckStatus metric samples"
   azureMonitor -> actionGroups "Triggers via monitor alert"
   actionGroups -> slackLogicApps "Invokes Logic App receiver"
   slackLogicApps -> slackWorkspace "Posts message via incoming webhook"
@@ -77,11 +95,59 @@ model {
 views {
   view index {
     title "Alert Runtime Path"
+    include azurePlatform
+    include externalAlerting
+    include keyVault
+    include functionAppHealth
     include azureMonitor
     include sharedAlerting.actionGroups
     include sharedAlerting.slackLogicApps
     include sharedAlerting.emailReceiver
     include sharedAlerting.webhookReceiver
     include slackWorkspace
+
+    style azurePlatform {
+      color indigo
+      opacity 12%
+      border solid
+    }
+
+    style externalAlerting {
+      color amber
+      opacity 16%
+      border solid
+    }
+
+    style azureMonitor {
+      color primary
+    }
+
+    style keyVault {
+      color green
+    }
+
+    style functionAppHealth {
+      color red
+    }
+
+    style sharedAlerting.actionGroups {
+      color secondary
+    }
+
+    style sharedAlerting.slackLogicApps {
+      color muted
+    }
+
+    style sharedAlerting.emailReceiver {
+      color gray
+    }
+
+    style sharedAlerting.webhookReceiver {
+      color gray
+    }
+
+    style slackWorkspace {
+      color amber
+    }
   }
 }
