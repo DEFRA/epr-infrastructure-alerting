@@ -46,6 +46,83 @@ model {
       description "Emits HealthCheckStatus metrics"
     }
 
+    webAppHealth = system "Web App Health Check" {
+      icon azure:app-services
+      description "Emits HealthCheckStatus metrics"
+    }
+
+    acrAlertPathCurrent = system "CONTAINER VULNERABILITY ALERT PATH" {
+      description "Current ACR vulnerability alert path"
+
+      acrContainerRegistryCurrent = system "Azure Container Registry" {
+        icon azure:container-registries
+        description "Hosts container images scanned by Defender for Cloud"
+      }
+
+      acrDefenderForCloudCurrent = system "Microsoft Defender for Cloud" {
+        icon azure:microsoft-defender-for-cloud
+        description "Scans ACR images and exports vulnerability findings to Log Analytics"
+      }
+
+      acrLogAnalyticsWorkspaceCurrent = system "Log Analytics Workspace" {
+        icon azure:log-analytics-workspaces
+        description "Receives Defender for Cloud exports; queried by scheduled alert rules"
+      }
+
+      acrVulnerabilityScheduledAlertCurrent = container "ACR Vulnerability Scheduled Alert" {
+        icon azure:monitor
+        technology "Microsoft.Insights/scheduledQueryRules"
+        description "Current scheduled query alert for ACR vulnerability findings"
+      }
+    }
+
+    keyVaultAlertPathCurrent = system "Key Vault Alert Path" {
+      description "Current Key Vault secret-expiry alert path"
+
+      keyVaultCurrent = system "Azure Key Vault" {
+        icon azure:key-vaults
+        description "Emits secret near-expiry events"
+      }
+
+      keyVaultSystemTopicCurrent = container "Key Vault System Topic" {
+        icon azure:event-grid-topics
+        technology "Microsoft.EventGrid/systemTopics"
+        description "Current system topic bound to Key Vault event source"
+      }
+
+      keyVaultExpirySubscriptionCurrent = container "Key Vault Expiry Event Subscription" {
+        icon azure:event-grid-subscriptions
+        technology "Microsoft.EventGrid/systemTopics/eventSubscriptions"
+        description "Current event subscription filtering SecretNearExpiry and forwarding to MonitorAlert"
+      }
+    }
+
+    healthAlertPathCurrent = system "APPLICATION HEALTH ALERT PATH" {
+      description "Current health-check metric alert path for function and web apps"
+
+      functionAppHealthCurrent = system "Function App Health Check" {
+        icon azure:function-apps
+        description "Emits HealthCheckStatus metrics"
+      }
+
+      functionAppHealthMetricAlertCurrent = system "Function App HealthCheck Metric Alert" {
+        icon azure:monitor
+        technology "Microsoft.Insights/metricAlerts"
+        description "Current metric alert rule evaluating Function App HealthCheckStatus"
+      }
+
+      webAppHealthCurrent = system "Web App Health Check" {
+        icon azure:app-services
+        description "Emits HealthCheckStatus metrics"
+      }
+
+      webAppHealthMetricAlertCurrent = system "Web App HealthCheck Metric Alert" {
+        icon azure:monitor
+        technology "Microsoft.Insights/metricAlerts"
+        description "Current metric alert rule evaluating Web App HealthCheckStatus"
+      }
+    }
+
     eventGrid = system "Azure Event Grid" {
       icon azure:event-grid-topics
       description "Routes Key Vault events to Azure Monitor"
@@ -147,8 +224,37 @@ model {
       }
 
       webhookReceiver = component "Webhook Receiver" {
+        icon tech:microsoft-teams
         technology "Action Group webhookReceivers"
         description "Optional non-Slack webhook notifications"
+      }
+    }
+
+    alertingPlatform = system "Alerting Platform" {
+      description "Current alerting runtime resources deployed by shared-infra/alerting"
+
+      genericActionGroup = container "Generic Action Group" {
+        icon azure:monitor
+        technology "Microsoft.Insights/actionGroups"
+        description "Generic action group used by current alert routes"
+      }
+
+      genericSlackLogicApp = container "Common Alert Schema Slack Logic App" {
+        icon azure:logic-apps
+        technology "Microsoft.Logic/workflows"
+        description "Handles alerts following the Azure Monitor Common Alert Schema and posts formatted messages to Slack"
+      }
+
+      genericEmailReceiver = component "Email Receiver" {
+        icon tech:google-gmail
+        technology "Action Group emailReceivers"
+        description "Optional email receiver integration for generic action group"
+      }
+
+      genericWebhookReceiver = component "Webhook Receiver" {
+        icon tech:microsoft-teams
+        technology "Action Group webhookReceivers"
+        description "Optional webhook receiver integration for generic action group"
       }
     }
   }
@@ -189,11 +295,37 @@ model {
   azureMonitorEvaluation.healthCheckMetricAlert -> healthCheckActionGroup "Fires alert to"
   healthCheckActionGroup -> healthCheckSlackLogicApp "Invokes"
   healthCheckSlackLogicApp -> slackWorkspace "Posts health check message"
+
+  pipeline -> keyVaultSystemTopicCurrent "Deploys"
+  pipeline -> keyVaultExpirySubscriptionCurrent "Deploys"
+  pipeline -> functionAppHealthMetricAlertCurrent "Deploys"
+  pipeline -> webAppHealthMetricAlertCurrent "Deploys"
+  pipeline -> acrVulnerabilityScheduledAlertCurrent "Deploys"
+  pipeline -> alertingPlatform.genericActionGroup "Deploys"
+  pipeline -> alertingPlatform.genericSlackLogicApp "Deploys"
+
+  acrContainerRegistryCurrent -> acrDefenderForCloudCurrent "Images scanned by"
+  acrDefenderForCloudCurrent -> acrLogAnalyticsWorkspaceCurrent "Exports findings via Continuous Export"
+  acrLogAnalyticsWorkspaceCurrent -> acrVulnerabilityScheduledAlertCurrent "Queried by"
+  acrVulnerabilityScheduledAlertCurrent -> alertingPlatform.genericActionGroup "Fires alert to"
+  keyVaultCurrent -> keyVaultSystemTopicCurrent "Publishes SecretNearExpiry events"
+  keyVaultSystemTopicCurrent -> keyVaultExpirySubscriptionCurrent "Routes matching events"
+  keyVaultExpirySubscriptionCurrent -> azureMonitorEvaluation.azureMonitor "Delivers MonitorAlert events"
+  azureMonitorEvaluation.azureMonitor -> alertingPlatform.genericActionGroup "Triggers via monitor alert"
+  functionAppHealthCurrent -> functionAppHealthMetricAlertCurrent "Publishes health metrics"
+  webAppHealthCurrent -> webAppHealthMetricAlertCurrent "Publishes health metrics"
+  functionAppHealthMetricAlertCurrent -> azureMonitorEvaluation.azureMonitor "Evaluated by"
+  webAppHealthMetricAlertCurrent -> azureMonitorEvaluation.azureMonitor "Evaluated by"
+  alertingPlatform.genericActionGroup -> alertingPlatform.genericSlackLogicApp "Invokes"
+  alertingPlatform.genericActionGroup -> alertingPlatform.genericEmailReceiver
+  alertingPlatform.genericActionGroup -> alertingPlatform.genericWebhookReceiver
+  alertingPlatform.genericSlackLogicApp -> slackWorkspace "Posts message via incoming webhook"
 }
 
 views {
   view index {
-    title "Alert Runtime Path"
+    title "Alert Runtime Path v1"
+    description "Initial shared-platform design with a common alerting stack across services."
     include azurePlatform
     include externalAlerting
     include keyVault
@@ -299,184 +431,6 @@ views {
       color gray
     }
 
-    style slackWorkspace {
-      color amber
-    }
-  }
-
-  view v2 {
-    title "Alert Runtime Path v2"
-    include azurePlatform
-    include externalAlerting
-    include containerRegistry
-    include defenderForCloud
-    include logAnalyticsWorkspace
-    include acrVulnerabilityScheduledAlert
-    include sharedAlerting.typeSpecificActionGroups
-    include sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup
-    include sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup
-    include sharedAlerting.typeSpecificLogicApps
-    include sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp
-    include sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp
-    include functionAppHealth
-    include azureMonitorEvaluation.healthCheckMetricAlert
-    include keyVault
-    include eventGrid
-    include eventGrid.keyVaultSystemTopic
-    include eventGrid.keyVaultExpirySubscription
-    include azureMonitorEvaluation.azureMonitor
-    include sharedAlerting.actionGroups
-    include sharedAlerting.slackLogicApps
-    include slackWorkspace
-
-    // ACR vulnerability path
-    include containerRegistry -> defenderForCloud with {
-      color sky
-      line solid
-    }
-    include defenderForCloud -> logAnalyticsWorkspace with {
-      color sky
-      line solid
-    }
-    include logAnalyticsWorkspace -> acrVulnerabilityScheduledAlert with {
-      color sky
-      line solid
-    }
-    include acrVulnerabilityScheduledAlert -> sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup with {
-      color sky
-      line solid
-    }
-    include sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup -> sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp with {
-      color sky
-      line solid
-    }
-    include sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp -> slackWorkspace with {
-      color sky
-      line solid
-    }
-
-    // Health check path
-    include functionAppHealth -> azureMonitorEvaluation.healthCheckMetricAlert with {
-      color amber
-      line solid
-    }
-    include azureMonitorEvaluation.healthCheckMetricAlert -> sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup with {
-      color amber
-      line solid
-    }
-    include sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup -> sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp with {
-      color amber
-      line solid
-    }
-    include sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp -> slackWorkspace with {
-      color amber
-      line solid
-    }
-
-    // Key Vault path (shared generic action group + logic app, not yet type-specific)
-    include keyVault -> eventGrid.keyVaultSystemTopic with {
-      color green
-      line solid
-    }
-    include eventGrid.keyVaultSystemTopic -> eventGrid.keyVaultExpirySubscription with {
-      color green
-      line solid
-    }
-    include eventGrid.keyVaultExpirySubscription -> azureMonitorEvaluation.azureMonitor with {
-      color green
-      line solid
-    }
-    include azureMonitorEvaluation.azureMonitor -> sharedAlerting.actionGroups with {
-      color green
-      line solid
-    }
-    include sharedAlerting.actionGroups -> sharedAlerting.slackLogicApps with {
-      color green
-      line solid
-    }
-    include sharedAlerting.slackLogicApps -> slackWorkspace with {
-      color green
-      line solid
-    }
-
-    style azurePlatform {
-      color indigo
-      opacity 12%
-      border solid
-    }
-    style externalAlerting {
-      color amber
-      opacity 16%
-      border solid
-    }
-    style azureMonitorEvaluation {
-      color primary
-      opacity 12%
-      border solid
-    }
-    style eventGrid {
-      color secondary
-      opacity 12%
-      border solid
-    }
-    style azureMonitorEvaluation.azureMonitor {
-      color green
-    }
-    style azureMonitorEvaluation.healthCheckMetricAlert {
-      color amber
-    }
-    style containerRegistry {
-      color sky
-    }
-    style defenderForCloud {
-      color sky
-    }
-    style logAnalyticsWorkspace {
-      color sky
-    }
-    style acrVulnerabilityScheduledAlert {
-      color sky
-    }
-    style functionAppHealth {
-      color amber
-    }
-    style keyVault {
-      color green
-    }
-    style eventGrid.keyVaultSystemTopic {
-      color green
-    }
-    style eventGrid.keyVaultExpirySubscription {
-      color green
-    }
-    style sharedAlerting.typeSpecificActionGroups {
-      color secondary
-      opacity 15%
-      border dashed
-    }
-    style sharedAlerting.typeSpecificLogicApps {
-      color muted
-      opacity 15%
-      border dashed
-    }
-    style sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup {
-      color sky
-    }
-    style sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp {
-      color sky
-    }
-    style sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup {
-      color amber
-    }
-    style sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp {
-      color amber
-    }
-    style sharedAlerting.actionGroups {
-      color green
-    }
-    style sharedAlerting.slackLogicApps {
-      color green
-    }
     style slackWorkspace {
       color amber
     }

@@ -2,3 +2,4 @@
 modules/*.json
 params/*.json
 **/node_modules/
+/docs/dist/**

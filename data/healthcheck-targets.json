@@ -1,0 +1,10 @@
+[
+    {
+        "targetName": "DEVRWDWEBFA1401",
+        "targetResourceGroup": "devrwdwebrg1401"
+    },
+    {
+        "targetName": "DEVRWDWEBWA1401",
+        "targetResourceGroup": "devrwdwebrg1401"
+    }
+]

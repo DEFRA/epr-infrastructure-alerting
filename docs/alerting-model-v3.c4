@@ -1,0 +1,169 @@
+views {
+  view v3 {
+    title "Alert Runtime Path v3"
+    description "Current-state design consolidated back into a single alerting platform with generic routing components."
+    include azurePlatform
+    include externalAlerting
+    include azurePlatform.acrAlertPathCurrent
+    include azurePlatform.alertingPlatform
+    include azurePlatform.keyVaultAlertPathCurrent
+    include azurePlatform.healthAlertPathCurrent
+    include azurePlatform.azureMonitorEvaluation.azureMonitor
+    include azurePlatform.alertingPlatform.genericActionGroup
+    include azurePlatform.alertingPlatform.genericSlackLogicApp
+    include azurePlatform.alertingPlatform.genericEmailReceiver
+    include azurePlatform.alertingPlatform.genericWebhookReceiver
+    include externalAlerting.slackWorkspace
+
+    // ACR vulnerability path (current: generic action group + logic app)
+    include azurePlatform.acrAlertPathCurrent.acrContainerRegistryCurrent -> azurePlatform.acrAlertPathCurrent.acrDefenderForCloudCurrent with {
+      color sky
+      line solid
+    }
+    include azurePlatform.acrAlertPathCurrent.acrDefenderForCloudCurrent -> azurePlatform.acrAlertPathCurrent.acrLogAnalyticsWorkspaceCurrent with {
+      color sky
+      line solid
+    }
+    include azurePlatform.acrAlertPathCurrent.acrLogAnalyticsWorkspaceCurrent -> azurePlatform.acrAlertPathCurrent.acrVulnerabilityScheduledAlertCurrent with {
+      color sky
+      line solid
+    }
+    include azurePlatform.acrAlertPathCurrent.acrVulnerabilityScheduledAlertCurrent -> azurePlatform.alertingPlatform.genericActionGroup with {
+      color sky
+      line solid
+    }
+    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericSlackLogicApp with {
+      color sky
+      line solid
+    }
+    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericEmailReceiver with {
+      color gray
+      line dotted
+    }
+    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericWebhookReceiver with {
+      color gray
+      line dotted
+    }
+    include azurePlatform.alertingPlatform.genericSlackLogicApp -> externalAlerting.slackWorkspace with {
+      color sky
+      line solid
+    }
+
+    // Key Vault path (current: generic action group + logic app)
+    include azurePlatform.keyVaultAlertPathCurrent.keyVaultCurrent -> azurePlatform.keyVaultAlertPathCurrent.keyVaultSystemTopicCurrent with {
+      color green
+      line solid
+    }
+    include azurePlatform.keyVaultAlertPathCurrent.keyVaultSystemTopicCurrent -> azurePlatform.keyVaultAlertPathCurrent.keyVaultExpirySubscriptionCurrent with {
+      color green
+      line solid
+    }
+    include azurePlatform.keyVaultAlertPathCurrent.keyVaultExpirySubscriptionCurrent -> azurePlatform.azureMonitorEvaluation.azureMonitor with {
+      color green
+      line solid
+    }
+    include azurePlatform.azureMonitorEvaluation.azureMonitor -> azurePlatform.alertingPlatform.genericActionGroup with {
+      color green
+      line solid
+    }
+
+    // Health check metric alerts path (current: function and web app)
+    include azurePlatform.healthAlertPathCurrent.functionAppHealthCurrent -> azurePlatform.healthAlertPathCurrent.functionAppHealthMetricAlertCurrent with {
+      color primary
+      line solid
+    }
+    include azurePlatform.healthAlertPathCurrent.webAppHealthCurrent -> azurePlatform.healthAlertPathCurrent.webAppHealthMetricAlertCurrent with {
+      color red
+      line solid
+    }
+    include azurePlatform.healthAlertPathCurrent.functionAppHealthMetricAlertCurrent -> azurePlatform.azureMonitorEvaluation.azureMonitor with {
+      color primary
+      line solid
+    }
+    include azurePlatform.healthAlertPathCurrent.webAppHealthMetricAlertCurrent -> azurePlatform.azureMonitorEvaluation.azureMonitor with {
+      color red
+      line solid
+    }
+    style azurePlatform {
+      color indigo
+      opacity 12%
+      border solid
+    }
+    style externalAlerting {
+      color amber
+      opacity 16%
+      border solid
+    }
+    style azurePlatform.alertingPlatform {
+      color secondary
+      opacity 12%
+      border solid
+    }
+    style azurePlatform.acrAlertPathCurrent {
+      color amber
+      opacity 10%
+      border solid
+    }
+    style azurePlatform.keyVaultAlertPathCurrent {
+      color green
+      opacity 10%
+      border solid
+    }
+    style azurePlatform.healthAlertPathCurrent {
+      color primary
+      opacity 10%
+      border solid
+    }
+    style azurePlatform.azureMonitorEvaluation.azureMonitor {
+      color primary
+    }
+    style azurePlatform.acrAlertPathCurrent.acrContainerRegistryCurrent {
+      color amber
+    }
+    style azurePlatform.acrAlertPathCurrent.acrDefenderForCloudCurrent {
+      color amber
+    }
+    style azurePlatform.acrAlertPathCurrent.acrLogAnalyticsWorkspaceCurrent {
+      color amber
+    }
+    style azurePlatform.acrAlertPathCurrent.acrVulnerabilityScheduledAlertCurrent {
+      color amber
+    }
+    style azurePlatform.keyVaultAlertPathCurrent.keyVaultCurrent {
+      color green
+    }
+    style azurePlatform.keyVaultAlertPathCurrent.keyVaultSystemTopicCurrent {
+      color green
+    }
+    style azurePlatform.keyVaultAlertPathCurrent.keyVaultExpirySubscriptionCurrent {
+      color green
+    }
+    style azurePlatform.healthAlertPathCurrent.functionAppHealthCurrent {
+      color primary
+    }
+    style azurePlatform.healthAlertPathCurrent.webAppHealthCurrent {
+      color red
+    }
+    style azurePlatform.healthAlertPathCurrent.functionAppHealthMetricAlertCurrent {
+      color primary
+    }
+    style azurePlatform.healthAlertPathCurrent.webAppHealthMetricAlertCurrent {
+      color red
+    }
+    style azurePlatform.alertingPlatform.genericActionGroup {
+      color secondary
+    }
+    style azurePlatform.alertingPlatform.genericSlackLogicApp {
+      color muted
+    }
+    style azurePlatform.alertingPlatform.genericEmailReceiver {
+      color slate
+    }
+    style azurePlatform.alertingPlatform.genericWebhookReceiver {
+      color slate
+    }
+    style externalAlerting.slackWorkspace {
+      color gray
+    }
+  }
+}

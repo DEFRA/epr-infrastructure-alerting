@@ -57,7 +57,7 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
         }
         Get_Severity_Display: {
           type: 'Compose'
-          inputs: '@{if(or(equals(outputs(\'Get_Severity\'), \'sev0\'), equals(outputs(\'Get_Severity\'), \'0\')), \'💀 Critical\', if(or(equals(outputs(\'Get_Severity\'), \'sev1\'), equals(outputs(\'Get_Severity\'), \'1\')), \'🚨 Error\', if(or(equals(outputs(\'Get_Severity\'), \'sev2\'), equals(outputs(\'Get_Severity\'), \'2\')), \'⚠️ Warning\', if(or(equals(outputs(\'Get_Severity\'), \'sev3\'), equals(outputs(\'Get_Severity\'), \'3\')), \'ℹ️ Informational\', if(or(equals(outputs(\'Get_Severity\'), \'sev4\'), equals(outputs(\'Get_Severity\'), \'4\')), \'🔹 Verbose\', \'Unknown\')))))}'
+          inputs: '@{if(or(equals(outputs(\'Get_Severity\'), \'sev0\'), equals(outputs(\'Get_Severity\'), \'0\')), \'💀 Critical\', if(or(equals(outputs(\'Get_Severity\'), \'sev1\'), equals(outputs(\'Get_Severity\'), \'1\')), \'🚨 Error\', if(or(equals(outputs(\'Get_Severity\'), \'sev2\'), equals(outputs(\'Get_Severity\'), \'2\')), \'⚠️ Warning\', if(or(equals(outputs(\'Get_Severity\'), \'sev3\'), equals(outputs(\'Get_Severity\'), \'3\')), \'ℹ️ Informational\', if(or(equals(outputs(\'Get_Severity\'), \'sev4\'), equals(outputs(\'Get_Severity\'), \'4\')), \'📝 Verbose\', \'Unknown\')))))}'
           runAfter: {
             Get_Severity: ['Succeeded']
           }

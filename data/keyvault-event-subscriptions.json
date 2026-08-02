@@ -1,0 +1,50 @@
+[
+  {
+    "nameSuffix": "SecretExpired",
+    "description": "An Alert has been raised because a Key Vault secret has expired",
+    "eventTypes": [
+      "Microsoft.KeyVault.SecretExpired"
+    ],
+    "severity": "Sev1"
+  },
+  {
+    "nameSuffix": "SecretNearExpiry",
+    "description": "An Alert has been raised because a Key Vault secret has 30 days left before expiry",
+    "eventTypes": [
+      "Microsoft.KeyVault.SecretNearExpiry"
+    ],
+    "severity": "Sev2"
+  },
+  {
+    "nameSuffix": "SecretNewVersion",
+    "description": "An Alert has been raised because a new version of a Key Vault secret has been created",
+    "eventTypes": [
+      "Microsoft.KeyVault.SecretNewVersionCreated"
+    ],
+    "severity": "Sev3"
+  },
+  {
+    "nameSuffix": "CertificateExpired",
+    "description": "An Alert has been raised because a Key Vault certificate has expired",
+    "eventTypes": [
+      "Microsoft.KeyVault.CertificateExpired"
+    ],
+    "severity": "Sev1"
+  },
+  {
+    "nameSuffix": "CertificateNearExpiry",
+    "description": "An Alert has been raised because a Key Vault certificate has 30 days left before expiry",
+    "eventTypes": [
+      "Microsoft.KeyVault.CertificateNearExpiry"
+    ],
+    "severity": "Sev2"
+  },
+  {
+    "nameSuffix": "CertificateNewVersion",
+    "description": "An Alert has been raised because a new version of a Key Vault certificate has been created",
+    "eventTypes": [
+      "Microsoft.KeyVault.CertificateNewVersionCreated"
+    ],
+    "severity": "Sev3"
+  }
+]

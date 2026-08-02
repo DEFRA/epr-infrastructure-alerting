@@ -1,0 +1,180 @@
+views {
+  view v2 {
+    title "Alert Runtime Path v2"
+    description "Per-team stack design with type-specific action groups and logic apps for each alert path."
+    include azurePlatform
+    include externalAlerting
+    include azurePlatform.containerRegistry
+    include azurePlatform.defenderForCloud
+    include azurePlatform.logAnalyticsWorkspace
+    include azurePlatform.acrVulnerabilityScheduledAlert
+    include azurePlatform.sharedAlerting.typeSpecificActionGroups
+    include azurePlatform.sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup
+    include azurePlatform.sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup
+    include azurePlatform.sharedAlerting.typeSpecificLogicApps
+    include azurePlatform.sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp
+    include azurePlatform.sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp
+    include azurePlatform.functionAppHealth
+    include azurePlatform.azureMonitorEvaluation.healthCheckMetricAlert
+    include azurePlatform.keyVault
+    include azurePlatform.eventGrid
+    include azurePlatform.eventGrid.keyVaultSystemTopic
+    include azurePlatform.eventGrid.keyVaultExpirySubscription
+    include azurePlatform.azureMonitorEvaluation.azureMonitor
+    include azurePlatform.sharedAlerting.actionGroups
+    include azurePlatform.sharedAlerting.slackLogicApps
+    include externalAlerting.slackWorkspace
+
+    // ACR vulnerability path
+    include azurePlatform.containerRegistry -> azurePlatform.defenderForCloud with {
+      color sky
+      line solid
+    }
+    include azurePlatform.defenderForCloud -> azurePlatform.logAnalyticsWorkspace with {
+      color sky
+      line solid
+    }
+    include azurePlatform.logAnalyticsWorkspace -> azurePlatform.acrVulnerabilityScheduledAlert with {
+      color sky
+      line solid
+    }
+    include azurePlatform.acrVulnerabilityScheduledAlert -> azurePlatform.sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup with {
+      color sky
+      line solid
+    }
+    include azurePlatform.sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup -> azurePlatform.sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp with {
+      color sky
+      line solid
+    }
+    include azurePlatform.sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp -> externalAlerting.slackWorkspace with {
+      color sky
+      line solid
+    }
+
+    // Health check path
+    include azurePlatform.functionAppHealth -> azurePlatform.azureMonitorEvaluation.healthCheckMetricAlert with {
+      color amber
+      line solid
+    }
+    include azurePlatform.azureMonitorEvaluation.healthCheckMetricAlert -> azurePlatform.sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup with {
+      color amber
+      line solid
+    }
+    include azurePlatform.sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup -> azurePlatform.sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp with {
+      color amber
+      line solid
+    }
+    include azurePlatform.sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp -> externalAlerting.slackWorkspace with {
+      color amber
+      line solid
+    }
+
+    // Key Vault path (shared generic action group + logic app, not yet type-specific)
+    include azurePlatform.keyVault -> azurePlatform.eventGrid.keyVaultSystemTopic with {
+      color green
+      line solid
+    }
+    include azurePlatform.eventGrid.keyVaultSystemTopic -> azurePlatform.eventGrid.keyVaultExpirySubscription with {
+      color green
+      line solid
+    }
+    include azurePlatform.eventGrid.keyVaultExpirySubscription -> azurePlatform.azureMonitorEvaluation.azureMonitor with {
+      color green
+      line solid
+    }
+    include azurePlatform.azureMonitorEvaluation.azureMonitor -> azurePlatform.sharedAlerting.actionGroups with {
+      color green
+      line solid
+    }
+    include azurePlatform.sharedAlerting.actionGroups -> azurePlatform.sharedAlerting.slackLogicApps with {
+      color green
+      line solid
+    }
+    include azurePlatform.sharedAlerting.slackLogicApps -> externalAlerting.slackWorkspace with {
+      color green
+      line solid
+    }
+
+    style azurePlatform {
+      color indigo
+      opacity 12%
+      border solid
+    }
+    style externalAlerting {
+      color amber
+      opacity 16%
+      border solid
+    }
+    style azurePlatform.azureMonitorEvaluation {
+      color primary
+      opacity 12%
+      border solid
+    }
+    style azurePlatform.eventGrid {
+      color secondary
+      opacity 12%
+      border solid
+    }
+    style azurePlatform.azureMonitorEvaluation.azureMonitor {
+      color green
+    }
+    style azurePlatform.azureMonitorEvaluation.healthCheckMetricAlert {
+      color amber
+    }
+    style azurePlatform.containerRegistry {
+      color sky
+    }
+    style azurePlatform.defenderForCloud {
+      color sky
+    }
+    style azurePlatform.logAnalyticsWorkspace {
+      color sky
+    }
+    style azurePlatform.acrVulnerabilityScheduledAlert {
+      color sky
+    }
+    style azurePlatform.functionAppHealth {
+      color amber
+    }
+    style azurePlatform.keyVault {
+      color green
+    }
+    style azurePlatform.eventGrid.keyVaultSystemTopic {
+      color green
+    }
+    style azurePlatform.eventGrid.keyVaultExpirySubscription {
+      color green
+    }
+    style azurePlatform.sharedAlerting.typeSpecificActionGroups {
+      color secondary
+      opacity 15%
+      border dashed
+    }
+    style azurePlatform.sharedAlerting.typeSpecificLogicApps {
+      color muted
+      opacity 15%
+      border dashed
+    }
+    style azurePlatform.sharedAlerting.typeSpecificActionGroups.acrVulnerabilityActionGroup {
+      color sky
+    }
+    style azurePlatform.sharedAlerting.typeSpecificLogicApps.acrVulnerabilitySlackLogicApp {
+      color sky
+    }
+    style azurePlatform.sharedAlerting.typeSpecificActionGroups.healthCheckActionGroup {
+      color amber
+    }
+    style azurePlatform.sharedAlerting.typeSpecificLogicApps.healthCheckSlackLogicApp {
+      color amber
+    }
+    style azurePlatform.sharedAlerting.actionGroups {
+      color green
+    }
+    style azurePlatform.sharedAlerting.slackLogicApps {
+      color green
+    }
+    style externalAlerting.slackWorkspace {
+      color amber
+    }
+  }
+}

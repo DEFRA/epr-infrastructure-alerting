@@ -1,115 +1,29 @@
-import { alertTeamType, commonTags } from './common.bicep'
+import { commonTags } from './common.bicep'
 
-param teams alertTeamType[] = []
 param environmentNumber string
 param environmentType string
 param location string = resourceGroup().location
+param keyVaultName string
+param logAnalyticsWorkspaceName string
+param logAnalyticsWorkspaceResourceGroup string = resourceGroup().name
 
-module slackLogicApps './modules/logic-app/slack-alerting.bicep' = [for team in teams: {
-  params: {
-    workflowName: 'SlackChannel-${team.teamKey}'
-    location: location
-    slackWebhookUrl: team.slackWebhookUrl
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: team.teamKey
-      Team: team.teamKey
-    })
-  }
-}]
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: logAnalyticsWorkspaceName
+  scope: resourceGroup(logAnalyticsWorkspaceResourceGroup)
+}
 
-module acrVulnerabilitySlackLogicApps './modules/logic-app/slack-acrVulnerability.bicep' = [for team in teams: {
+module genericSlackLogicApps './modules/logicApp/slack-commonAlertSchema.bicep' = {
   params: {
-    workflowName: 'SlackChannel-AcrVulnerability-${team.teamKey}'
-    location: location
-    slackWebhookUrl: team.slackWebhookUrl
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: team.teamKey
-      Team: team.teamKey
-      AlertType: 'ACR-VULNERABILITY'
-    })
-  }
-}]
-
-module genericSlackLogicApps './modules/logic-app/slack-generic.bicep' = {
-  params: {
-    workflowName: 'SlackChannel-Generic'
+    workflowName: 'SlackChannel-CommonAlertSchema'
     location: location
     slackWebhookUrl: '***REMOVED***'
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: 'Generic'
-      AlertType: 'GENERIC'
     })
   }
 }
 
-module healthCheckSlackLogicApps './modules/logic-app/slack-healthCheckStatus.bicep' = [for team in teams: {
-  params: {
-    workflowName: 'SlackChannel-HealthCheck-${team.teamKey}'
-    location: location
-    slackWebhookUrl: team.slackWebhookUrl
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: team.teamKey
-      Team: team.teamKey
-      AlertType: 'HEALTH-CHECK'
-    })
-  }
-}]
-
-var slackTeamKeys = [for team in teams: team.teamKey]
-
-module alertActionGroups './modules/action-group/alerting.bicep' = [for team in teams: {
-  params: {
-    actionGroupName: team.actionGroupName
-    groupShortName: 'TeamAlerts'
-    workflowResourceId: slackLogicApps[indexOf(slackTeamKeys, team.teamKey)].outputs.workflowResourceId
-    workflowCallbackUrl: slackLogicApps[indexOf(slackTeamKeys, team.teamKey)].outputs.manualTriggerCallbackUrl
-    emailReceivers: team.emailReceivers
-    webhookReceivers: team.webhookReceivers
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: team.teamKey
-      Team: team.teamKey
-    })
-  }
-}]
-
-module acrVulnerabilityActionGroups './modules/action-group/acrVulnerability.bicep' = [for (team, i) in teams: {
-  params: {
-    actionGroupName: '${team.actionGroupName}-AcrVulnerability'
-    groupShortName: 'TeamAlerts'
-    workflowResourceId: acrVulnerabilitySlackLogicApps[i].outputs.workflowResourceId
-    workflowCallbackUrl: acrVulnerabilitySlackLogicApps[i].outputs.manualTriggerCallbackUrl
-    emailReceivers: team.emailReceivers
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: team.teamKey
-      Team: team.teamKey
-      AlertType: 'ACR-VULNERABILITY'
-    })
-  }
-}]
-
-module healthCheckStatusActionGroups './modules/action-group/healthCheckStatus.bicep' = [for (team, i) in teams: {
-  params: {
-    actionGroupName: '${team.actionGroupName}-HealthCheckStatus'
-    groupShortName: 'TeamAlerts'
-    workflowResourceId: healthCheckSlackLogicApps[i].outputs.workflowResourceId
-    workflowCallbackUrl: healthCheckSlackLogicApps[i].outputs.manualTriggerCallbackUrl
-    emailReceivers: team.emailReceivers
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-      AlertChannel: team.teamKey
-      Team: team.teamKey
-      AlertType: 'HEALTH-CHECK'
-    })
-  }
-}]
-
-module genericActionGroup './modules/action-group/generic.bicep' = {
+module genericActionGroup './modules/actionGroup/generic.bicep' = {
   params: {
     actionGroupName: 'ActionGroup-Generic'
     groupShortName: 'TeamAlerts'
@@ -117,18 +31,98 @@ module genericActionGroup './modules/action-group/generic.bicep' = {
     workflowCallbackUrl: genericSlackLogicApps.outputs.manualTriggerCallbackUrl
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
-      AlertType: 'GENERIC'
     })
   }
 }
 
-// Action group IDs are safe to output - consumers reference these to attach alerts
-output channels array = [for (team, i) in teams: {
-  teamKey: team.teamKey
-  actionGroupId: alertActionGroups[i].outputs.actionGroupId
-  actionGroupName: alertActionGroups[i].outputs.actionGroupName
-  acrVulnerabilityActionGroupId: acrVulnerabilityActionGroups[i].outputs.actionGroupId
-  acrVulnerabilityActionGroupName: acrVulnerabilityActionGroups[i].outputs.actionGroupName
-  healthCheckStatusActionGroupId: healthCheckStatusActionGroups[i].outputs.actionGroupId
-  healthCheckStatusActionGroupName: healthCheckStatusActionGroups[i].outputs.actionGroupName
+module systemTopic './modules/systemTopic.bicep' = {
+  params: {
+    systemTopicName: '${keyVaultName}-SecretExpiryTopic'
+    keyVaultName: keyVaultName
+    keyVaultResourceGroup: resourceGroup().name
+    keyVaultSubscriptionId: subscription().subscriptionId
+    location: location
+    customTags: union(commonTags, {
+      AlertType: 'KeyvaultEvents'
+      Environment: '${environmentType}${environmentNumber}'
+    })
+  }
+}
+
+module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for eventSubscription in loadJsonContent('./data/keyvault-event-subscriptions.json'): {
+  params: {
+    actionGroupResourceIds: [
+      genericActionGroup.outputs.actionGroupId
+    ]
+    eventSubscriptionDescription: eventSubscription.description
+    eventSubscriptionName: '${keyVaultName}-${eventSubscription.nameSuffix}'
+    includedEventTypes: eventSubscription.eventTypes
+    monitorAlertSeverity: eventSubscription.severity
+    systemTopicName: systemTopic.outputs.systemTopicName
+  }
+}]
+
+module healthCheckAlerts './modules/metricAlert.bicep' = [for target in loadJsonContent('./data/healthcheck-targets.json'): {
+  params: {
+    alertName: 'HealthCheckAlert-${target.targetName}'
+    actionGroupIds: [
+      genericActionGroup.outputs.actionGroupId
+    ]
+    targetResourceName: target.targetName
+    targetResourceGroup: target.targetResourceGroup
+    metricName: 'HealthCheckStatus'
+    customTags: union(commonTags, {
+      AlertType: 'HealthCheck'
+      Environment: '${environmentType}${environmentNumber}'
+    })
+  }
+}]
+
+resource acrVulnerabilityAlerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [for rule in loadJsonContent('./data/acr-vulnerability-query-rules.json'): {
+  name: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+  location: resourceGroup().location
+  kind: 'LogAlert'
+  tags: union(commonTags, {
+    Environment: '${environmentType}${environmentNumber}'
+    AlertType: 'AcrVulnerability'
+  })
+  properties: {
+    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+    description: rule.description
+    enabled: true
+    severity: rule.severity
+    evaluationFrequency: 'PT1H'
+    windowSize: 'PT1H'
+    scopes: [
+      logAnalyticsWorkspace.id
+    ]
+    targetResourceTypes: [
+      'Microsoft.ContainerRegistry/registries'
+    ]
+    criteria: {
+      allOf: [
+        {
+          query: rule.query
+          timeAggregation: 'Count'
+          operator: 'GreaterThan'
+          threshold: 0
+          failingPeriods: {
+            minFailingPeriodsToAlert: 1
+            numberOfEvaluationPeriods: 1
+          }
+        }
+      ]
+    }
+    actions: {
+      actionGroups: [
+        genericActionGroup.outputs.actionGroupId
+      ]
+      customProperties: {
+        AlertCategory: 'Security'
+        SignalSource: 'DefenderForCloud'
+      }
+    }
+    autoMitigate: false
+    skipQueryValidation: true
+  }
 }]
