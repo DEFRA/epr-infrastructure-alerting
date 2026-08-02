@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "description": "Local LikeC4 runner for shared-infra alerting docs",
   "scripts": {
-    "dev": "npx --yes likec4 start . --host 127.0.0.1 --port 5173",
-    "validate": "npx --yes likec4 validate --json --no-layout --file alerting-model.c4 .",
-    "build": "npx --yes likec4 build .",
-    "preview": "npx --yes likec4 preview ."
+    "dev": "likec4 start . --host 127.0.0.1 --port 5173",
+    "validate": "likec4 validate --json --no-layout --file alerting-model.c4 .",
+    "build": "likec4 build .",
+    "preview": "likec4 preview ."
+  },
+  "devDependencies": {
+    "likec4": "^1.59.2"
   }
 }

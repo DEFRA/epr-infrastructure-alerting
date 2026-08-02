@@ -1,0 +1,4 @@
+/*.json
+modules/*.json
+params/*.json
+**/node_modules/

@@ -5,26 +5,23 @@ param environmentNumber = '1'
 
 param teams = [
   {
-    teamKey: 'platformTeam'
     actionGroupName: 'ActionGroup-PlatformTeam'
-    groupShortName: 'AGPlatform'
-    slackWorkflowName: 'SlackChannel-PlatformTeam'
     emailReceivers: [
       'paul.barnard@esynergy.co.uk'
     ]
+    groupShortName: 'AGPlatform'
+    slackWebhookUrl: '***REMOVED***'
+    teamKey: 'platformTeam'
     webhookReceivers: []
   }
   {
-    teamKey: 'regulatorTeam'
     actionGroupName: 'ActionGroup-RegulatorTeam'
+    emailReceivers: [
+      'paul.barnard@esynergy.co.uk'
+    ]
     groupShortName: 'AGRegulator'
-    slackWorkflowName: 'SlackChannel-RegulatorTeam'
-    emailReceivers: []
+    slackWebhookUrl: '***REMOVED***'
+    teamKey: 'regulatorTeam'
     webhookReceivers: []
   }
 ]
-
-param slackWebhookUrls = {
-  platformTeam: '***REMOVED***'
-  regulatorTeam: '***REMOVED***'
-}

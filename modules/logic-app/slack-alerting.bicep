@@ -158,6 +158,9 @@ resource slackAlertWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             Get_ObjectName: [
               'Succeeded'
             ]
+            Get_Type_Display: [
+              'Succeeded'
+            ]
           }
         }
         Build_Slack_Message: {
