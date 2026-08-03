@@ -1,10 +1,12 @@
 [
     {
         "targetName": "DEVRWDWEBFA1401",
-        "targetResourceGroup": "devrwdwebrg1401"
+        "targetResourceGroup": "devrwdwebrg1401",
+        "description": "Health check for DEVRWDWEBFA1401 dropped below 100% in the last 5 minutes"
     },
     {
         "targetName": "DEVRWDWEBWA1401",
-        "targetResourceGroup": "devrwdwebrg1401"
+        "targetResourceGroup": "devrwdwebrg1401",
+        "description": "Health check for DEVRWDWEBWA1401 dropped below 100% in the last 5 minutes"
     }
 ]

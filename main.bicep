@@ -62,7 +62,7 @@ module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for even
   }
 }]
 
-module healthCheckAlerts './modules/metricAlert.bicep' = [for target in loadJsonContent('./data/healthcheck-targets.json'): {
+module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in loadJsonContent('./data/healthcheck-targets.json'): {
   params: {
     alertName: 'HealthCheckAlert-${target.targetName}'
     actionGroupIds: [
@@ -71,6 +71,7 @@ module healthCheckAlerts './modules/metricAlert.bicep' = [for target in loadJson
     targetResourceName: target.targetName
     targetResourceGroup: target.targetResourceGroup
     metricName: 'HealthCheckStatus'
+    description: target.description
     customTags: union(commonTags, {
       AlertType: 'HealthCheck'
       Environment: '${environmentType}${environmentNumber}'
