@@ -86,6 +86,167 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             Get_Alert_Id: ['Succeeded']
           }
         }
+        Get_Runbook_Url: {
+          type: 'Compose'
+          inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'customProperties\']?[\'runbookUrl\'], \'\')))}'
+          runAfter: {}
+        }
+        Get_Runbook_Button_Url: {
+          type: 'Compose'
+          inputs: '@{if(or(startsWith(toLower(outputs(\'Get_Runbook_Url\')), \'https://\'), startsWith(toLower(outputs(\'Get_Runbook_Url\')), \'http://\')), outputs(\'Get_Runbook_Url\'), \'\')}'
+          runAfter: {
+            Get_Runbook_Url: [ 'Succeeded' ]
+          }
+        }
+        Initialize_Slack_Blocks: {
+          type: 'InitializeVariable'
+          inputs: {
+            variables: [
+              {
+                name: 'SlackBlocks'
+                type: 'Array'
+                value: [
+                  {
+                    type: 'divider'
+                  }
+                  {
+                    type: 'header'
+                    text: {
+                      type: 'plain_text'
+                      text: '🔔 @{outputs(\'Get_Alert_Rule\')}'
+                    }
+                    level: 1
+                  }
+                  {
+                    type: 'rich_text'
+                    elements: [
+                      {
+                        type: 'rich_text_quote'
+                        elements: [
+                          {
+                            type: 'text'
+                            text: '@{outputs(\'Get_Description\')}'
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                  {
+                    type: 'section'
+                    fields: [
+                      {
+                        type: 'mrkdwn'
+                        text: '*State:*\n@{outputs(\'Get_Monitor_Condition\')}'
+                      }
+                      {
+                        type: 'mrkdwn'
+                        text: '*Severity:*\n@{outputs(\'Get_Severity_Display\')}'
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+          runAfter: {
+            Get_Alert_Portal_Link: [ 'Succeeded' ]
+            Get_Alert_Rule: [ 'Succeeded' ]
+            Get_Description: [ 'Succeeded' ]
+            Get_Monitor_Condition: [ 'Succeeded' ]
+            Get_Resource_Name: [ 'Succeeded' ]
+            Get_Severity_Display: [ 'Succeeded' ]
+            Get_Investigation_Link_Button_Url: [ 'Succeeded' ]
+            Get_Runbook_Button_Url: [ 'Succeeded' ]
+          }
+        }
+        Add_Runbook_Section_If_Present: {
+          type: 'If'
+          expression: '@not(empty(outputs(\'Get_Runbook_Button_Url\')))'
+          actions: {
+            Append_Runbook_Section: {
+              type: 'AppendToArrayVariable'
+              inputs: {
+                name: 'SlackBlocks'
+                value: {
+                  type: 'section'
+                  text: {
+                    type: 'mrkdwn'
+                    text: '*Runbook:*\n @{outputs(\'Get_Runbook_Button_Url\')}'
+                  }
+                }
+              }
+              runAfter: {}
+            }
+          }
+          else: {
+            actions: {}
+          }
+          runAfter: {
+            Initialize_Slack_Blocks: [ 'Succeeded' ]
+          }
+        }
+        Append_Resource_Section: {
+          type: 'AppendToArrayVariable'
+          inputs: {
+            name: 'SlackBlocks'
+            value: {
+              type: 'section'
+              text: {
+                type: 'mrkdwn'
+                text: '*Resource:*\n`@{outputs(\'Get_Resource_Name\')}`'
+              }
+            }
+          }
+          runAfter: {
+            Add_Runbook_Section_If_Present: [ 'Succeeded' ]
+          }
+        }
+        // AppendToArrayVariable only accepts one item; divider must be a separate append
+        Append_Divider: {
+          type: 'AppendToArrayVariable'
+          inputs: {
+            name: 'SlackBlocks'
+            value: {
+              type: 'divider'
+            }
+          }
+          runAfter: {
+            Append_Resource_Section: [ 'Succeeded' ]
+          }
+        }
+        Append_Action_Buttons: {
+          type: 'AppendToArrayVariable'
+          inputs: {
+            name: 'SlackBlocks'
+            value: {
+              type: 'actions'
+              elements: [
+                {
+                  type: 'button'
+                  text: {
+                    type: 'plain_text'
+                    text: '🔍 View Alert'
+                    emoji: false
+                  }
+                  style: 'primary'
+                  url: '@{outputs(\'Get_Alert_Portal_Link\')}'
+                }
+                {
+                  type: 'button'
+                  text: {
+                    type: 'plain_text'
+                    text: '🤖 Investigate Alert'
+                    emoji: false
+                  }
+                  url: '@{outputs(\'Get_Investigation_Link_Button_Url\')}'
+                }
+              ]
+            }
+          }
+          runAfter: {
+            Append_Divider: [ 'Succeeded' ]
+          }
+        }
         Post_To_Slack: {
           type: 'Http'
           inputs: {
@@ -95,97 +256,11 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
               'Content-Type': 'application/json'
             }
             body: {
-              blocks: [
-                {
-                  type: 'divider'
-                }
-                {
-                  type: 'header'
-                  text: {
-                    type: 'plain_text'
-                    text: '🔔 @{outputs(\'Get_Alert_Rule\')}'
-                  }
-                  level: 1
-                }
-                {
-                  type: 'rich_text'
-                  elements: [
-                    {
-                      type: 'rich_text_quote'
-                      elements: [
-                        {
-                          type: 'text'
-                          text: '@{outputs(\'Get_Description\')}'
-                        }
-                      ]
-                    }
-                  ]
-                }
-                {
-                  type: 'section'
-                  fields: [
-                    {
-                      type: 'mrkdwn'
-                      text: '*State:*\n@{outputs(\'Get_Monitor_Condition\')}'
-                    }
-                    {
-                      type: 'mrkdwn'
-                      text: '*Severity:*\n@{outputs(\'Get_Severity_Display\')}'
-                    }
-                  ]
-                }
-                {
-                  type: 'section'
-                  text: {
-                    type: 'mrkdwn'
-                    text: '*Runbook:*\nhttps://eaflood.atlassian.net/wiki/spaces/MWR/overview'
-                  }
-                }
-                {
-                  type: 'section'
-                  text: {
-                    type: 'mrkdwn'
-                    text: '*Resource:*\n`@{outputs(\'Get_Resource_Name\')}`'
-                  }
-                }
-                {
-                  type: 'divider'
-                }                
-                {
-                  type: 'actions'
-                  elements: [
-                    {
-                      type: 'button'
-                      text: {
-                        type: 'plain_text'
-                        text: '🔍 View Alert'
-                        emoji: false
-                      }
-                      style: 'primary'
-                      url: '@{outputs(\'Get_Alert_Portal_Link\')}'
-                    }
-                    {
-                      type: 'button'
-                      text: {
-                        type: 'plain_text'
-                        text: '🤖 Investigate Alert'
-                        emoji: false
-                      }
-                      url: '@{outputs(\'Get_Investigation_Link_Button_Url\')}'
-                    }
-                  ]
-                }
-              ]
+              blocks: '@{variables(\'SlackBlocks\')}'
             }
           }
           runAfter: {
-            Get_Alert_Portal_Link: ['Succeeded']
-            Get_Alert_Rule: ['Succeeded']
-            Get_Description: ['Succeeded']
-            Get_Monitor_Condition: ['Succeeded']
-            Get_Resource_Name: ['Succeeded']
-            Get_Severity_Display: ['Succeeded']
-            Get_Investigation_Link_Button_Url: ['Succeeded']
+            Append_Action_Buttons: [ 'Succeeded' ]
           }
         }
       }
