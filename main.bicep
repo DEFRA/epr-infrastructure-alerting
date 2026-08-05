@@ -6,10 +6,17 @@ param location string = resourceGroup().location
 param keyVaultName string
 param logAnalyticsWorkspaceName string
 param logAnalyticsWorkspaceResourceGroup string = resourceGroup().name
+param appInsightsName string
+param appInsightsResourceGroup string = resourceGroup().name
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsWorkspaceName
   scope: resourceGroup(logAnalyticsWorkspaceResourceGroup)
+}
+
+resource appInsightsComponent 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
+  scope: resourceGroup(appInsightsResourceGroup)
 }
 
 module genericSlackLogicApps './modules/logicApp/slack-commonAlertSchema.bicep' = {
@@ -79,51 +86,56 @@ module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for
   }
 }]
 
-resource acrVulnerabilityAlerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [for rule in loadJsonContent('./data/acr-vulnerability-query-rules.json'): {
-  name: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
-  location: resourceGroup().location
-  kind: 'LogAlert'
-  tags: union(commonTags, {
-    Environment: '${environmentType}${environmentNumber}'
-    AlertType: 'AcrVulnerability'
-  })
-  properties: {
+module acrVulnerabilityAlerts './modules/scheduledQuery/log-query-alert.bicep' = [for rule in loadJsonContent('./data/acr-vulnerability-query-rules.json'): {
+  name: 'acrVulnerability-${rule.nameSuffix}-${environmentType}${environmentNumber}'
+  params: {
+    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
     displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
     description: rule.description
-    enabled: true
     severity: rule.severity
     evaluationFrequency: 'PT1H'
     windowSize: 'PT1H'
-    scopes: [
-      logAnalyticsWorkspace.id
-    ]
+    query: rule.query
+    scopeResourceId: logAnalyticsWorkspace.id
     targetResourceTypes: [
       'Microsoft.ContainerRegistry/registries'
     ]
-    criteria: {
-      allOf: [
-        {
-          query: rule.query
-          timeAggregation: 'Count'
-          operator: 'GreaterThan'
-          threshold: 0
-          failingPeriods: {
-            minFailingPeriodsToAlert: 1
-            numberOfEvaluationPeriods: 1
-          }
-        }
-      ]
+    actionGroupId: genericActionGroup.outputs.actionGroupId
+    customProperties: {
+      AlertCategory: 'Security'
+      SignalSource: 'DefenderForCloud'
+      runbookUrl: rule.runbookUrl
     }
-    actions: {
-      actionGroups: [
-        genericActionGroup.outputs.actionGroupId
-      ]
-      customProperties: {
-        AlertCategory: 'Security'
-        SignalSource: 'DefenderForCloud'
-      }
+    customTags: union(commonTags, {
+      Environment: '${environmentType}${environmentNumber}'
+      AlertType: 'AcrVulnerability'
+    })
+  }
+}]
+
+module appInsightsQueryAlerts './modules/scheduledQuery/log-query-alert.bicep' = [for rule in loadJsonContent('./data/appinsights-query-rules.json'): {
+  name: 'appInsightsQuery-${rule.nameSuffix}-${environmentType}${environmentNumber}'
+  params: {
+    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+    description: rule.description
+    severity: rule.severity
+    evaluationFrequency: rule.evaluationFrequency
+    windowSize: rule.windowSize
+    query: rule.query
+    scopeResourceId: appInsightsComponent.id
+    targetResourceTypes: [
+      'Microsoft.Insights/components'
+    ]
+    actionGroupId: genericActionGroup.outputs.actionGroupId
+    customProperties: {
+      AlertCategory: 'Application'
+      SignalSource: 'AppInsights'
+      runbookUrl: rule.runbookUrl
     }
-    autoMitigate: false
-    skipQueryValidation: true
+    customTags: union(commonTags, {
+      Environment: '${environmentType}${environmentNumber}'
+      AlertType: 'AppInsightsQuery'
+    })
   }
 }]

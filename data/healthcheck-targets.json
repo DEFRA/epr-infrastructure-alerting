@@ -5,8 +5,23 @@
         "description": "Health check for DEVRWDWEBFA1401 dropped below 100% in the last 5 minutes"
     },
     {
+        "targetName": "DEVRWDWEBFA1402",
+        "targetResourceGroup": "devrwdwebrg1401",
+        "description": "Health check for DEVRWDWEBFA1402 dropped below 100% in the last 5 minutes"
+    },
+    {
+        "targetName": "DEVRWDWEBFA1403",
+        "targetResourceGroup": "devrwdwebrg1401",
+        "description": "Health check for DEVRWDWEBFA1403 dropped below 100% in the last 5 minutes"
+    },
+    {
         "targetName": "DEVRWDWEBWA1401",
         "targetResourceGroup": "devrwdwebrg1401",
         "description": "Health check for DEVRWDWEBWA1401 dropped below 100% in the last 5 minutes"
+    },
+    {
+        "targetName": "DEVRWDWEBWA1402",
+        "targetResourceGroup": "devrwdwebrg1401",
+        "description": "Health check for DEVRWDWEBWA1402 dropped below 100% in the last 5 minutes"
     }
 ]

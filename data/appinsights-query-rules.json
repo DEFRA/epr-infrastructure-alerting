@@ -1,0 +1,11 @@
+[
+  {
+    "nameSuffix": "AppInsights-AntiVirus-FileUploaded",
+    "description": "Alerts when the function app logs that a file was uploaded to blob storage for antivirus scan.",
+    "severity": 3,
+    "evaluationFrequency": "PT5M",
+    "windowSize": "PT5M",
+    "query": "traces | where message contains 'File Uploaded to blob storage'",
+    "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal"
+  }
+]
