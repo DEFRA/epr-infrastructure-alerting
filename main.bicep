@@ -1,29 +1,30 @@
 import { commonTags } from './common.bicep'
 
+param appInsightsName string
 param environmentNumber string
 param environmentType string
-param location string = resourceGroup().location
 param keyVaultName string
+param location string = resourceGroup().location
 param logAnalyticsWorkspaceName string
-param logAnalyticsWorkspaceResourceGroup string = resourceGroup().name
-param appInsightsName string
-param appInsightsResourceGroup string = resourceGroup().name
+param slackWebhookSecretName string
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsWorkspaceName
-  scope: resourceGroup(logAnalyticsWorkspaceResourceGroup)
 }
 
 resource appInsightsComponent 'Microsoft.Insights/components@2020-02-02' existing = {
   name: appInsightsName
-  scope: resourceGroup(appInsightsResourceGroup)
+}
+
+resource platformSecretsKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyVaultName
 }
 
 module genericSlackLogicApps './modules/logicApp/slack-commonAlertSchema.bicep' = {
   params: {
     workflowName: 'SlackChannel-CommonAlertSchema'
     location: location
-    slackWebhookUrl: '***REMOVED***'
+    slackWebhookUrl: platformSecretsKeyVault.getSecret(slackWebhookSecretName)
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
     })
@@ -86,21 +87,11 @@ module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for
   }
 }]
 
-module acrVulnerabilityAlerts './modules/scheduledQuery/log-query-alert.bicep' = [for rule in loadJsonContent('./data/acr-vulnerability-query-rules.json'): {
+module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/acr-vulnerability-query-rules.json'): {
   name: 'acrVulnerability-${rule.nameSuffix}-${environmentType}${environmentNumber}'
   params: {
-    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
-    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
-    description: rule.description
-    severity: rule.severity
-    evaluationFrequency: 'PT1H'
-    windowSize: 'PT1H'
-    query: rule.query
-    scopeResourceId: logAnalyticsWorkspace.id
-    targetResourceTypes: [
-      'Microsoft.ContainerRegistry/registries'
-    ]
     actionGroupId: genericActionGroup.outputs.actionGroupId
+    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
     customProperties: {
       AlertCategory: 'Security'
       SignalSource: 'DefenderForCloud'
@@ -110,24 +101,24 @@ module acrVulnerabilityAlerts './modules/scheduledQuery/log-query-alert.bicep' =
       Environment: '${environmentType}${environmentNumber}'
       AlertType: 'AcrVulnerability'
     })
+    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+    description: rule.description
+    evaluationFrequency: 'PT1H'
+    query: rule.query
+    scopeResourceId: logAnalyticsWorkspace.id
+    severity: rule.severity
+    targetResourceTypes: [
+      'Microsoft.ContainerRegistry/registries'
+    ]
+    windowSize: 'PT1H'
   }
 }]
 
-module appInsightsQueryAlerts './modules/scheduledQuery/log-query-alert.bicep' = [for rule in loadJsonContent('./data/appinsights-query-rules.json'): {
+module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/appinsights-query-rules.json'): {
   name: 'appInsightsQuery-${rule.nameSuffix}-${environmentType}${environmentNumber}'
   params: {
-    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
-    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
-    description: rule.description
-    severity: rule.severity
-    evaluationFrequency: rule.evaluationFrequency
-    windowSize: rule.windowSize
-    query: rule.query
-    scopeResourceId: appInsightsComponent.id
-    targetResourceTypes: [
-      'Microsoft.Insights/components'
-    ]
     actionGroupId: genericActionGroup.outputs.actionGroupId
+    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
     customProperties: {
       AlertCategory: 'Application'
       SignalSource: 'AppInsights'
@@ -137,5 +128,15 @@ module appInsightsQueryAlerts './modules/scheduledQuery/log-query-alert.bicep' =
       Environment: '${environmentType}${environmentNumber}'
       AlertType: 'AppInsightsQuery'
     })
+    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+    description: rule.description
+    evaluationFrequency: rule.evaluationFrequency
+    query: rule.query
+    scopeResourceId: appInsightsComponent.id
+    severity: rule.severity
+    targetResourceTypes: [
+      'Microsoft.Insights/components'
+    ]
+    windowSize: rule.windowSize
   }
 }]
