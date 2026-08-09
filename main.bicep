@@ -6,7 +6,16 @@ param environmentType string
 param keyVaultName string
 param location string = resourceGroup().location
 param logAnalyticsWorkspaceName string
-param slackWebhookSecretName string
+param slackPlatformSecretName string
+
+var appInsightsQueryRules = concat(
+  loadJsonContent('./data/team1/appinsights-query-rules.json')
+)
+
+var healthcheckTargets = concat(
+  loadJsonContent('./data/platform/healthcheck-targets.json'),
+  loadJsonContent('./data/team1/healthcheck-targets.json')
+)
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsWorkspaceName
@@ -24,7 +33,7 @@ module genericSlackLogicApps './modules/logicApp/slack-commonAlertSchema.bicep' 
   params: {
     workflowName: 'SlackChannel-CommonAlertSchema'
     location: location
-    slackWebhookUrl: platformSecretsKeyVault.getSecret(slackWebhookSecretName)
+    slackWebhookUrl: platformSecretsKeyVault.getSecret(slackPlatformSecretName)
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
     })
@@ -57,37 +66,7 @@ module systemTopic './modules/systemTopic.bicep' = {
   }
 }
 
-module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for eventSubscription in loadJsonContent('./data/keyvault-event-subscriptions.json'): {
-  params: {
-    actionGroupResourceIds: [
-      genericActionGroup.outputs.actionGroupId
-    ]
-    eventSubscriptionDescription: eventSubscription.description
-    eventSubscriptionName: '${keyVaultName}-${eventSubscription.nameSuffix}'
-    includedEventTypes: eventSubscription.eventTypes
-    monitorAlertSeverity: eventSubscription.severity
-    systemTopicName: systemTopic.outputs.systemTopicName
-  }
-}]
-
-module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in loadJsonContent('./data/healthcheck-targets.json'): {
-  params: {
-    alertName: 'HealthCheckAlert-${target.targetName}'
-    actionGroupIds: [
-      genericActionGroup.outputs.actionGroupId
-    ]
-    targetResourceName: target.targetName
-    targetResourceGroup: target.targetResourceGroup
-    metricName: 'HealthCheckStatus'
-    description: target.description
-    customTags: union(commonTags, {
-      AlertType: 'HealthCheck'
-      Environment: '${environmentType}${environmentNumber}'
-    })
-  }
-}]
-
-module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/acr-vulnerability-query-rules.json'): {
+module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/platform/acr-vulnerability-query-rules.json'): {
   name: 'acrVulnerability-${rule.nameSuffix}-${environmentType}${environmentNumber}'
   params: {
     actionGroupId: genericActionGroup.outputs.actionGroupId
@@ -114,7 +93,37 @@ module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule i
   }
 }]
 
-module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/appinsights-query-rules.json'): {
+module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for eventSubscription in loadJsonContent('./data/platform/keyvault-event-subscriptions.json'): {
+  params: {
+    actionGroupResourceIds: [
+      genericActionGroup.outputs.actionGroupId
+    ]
+    eventSubscriptionDescription: eventSubscription.description
+    eventSubscriptionName: '${keyVaultName}-${eventSubscription.nameSuffix}'
+    includedEventTypes: eventSubscription.eventTypes
+    monitorAlertSeverity: eventSubscription.severity
+    systemTopicName: systemTopic.outputs.systemTopicName
+  }
+}]
+
+module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in healthcheckTargets: {
+  params: {
+    alertName: 'HealthCheckAlert-${replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)}'
+    actionGroupIds: [
+      genericActionGroup.outputs.actionGroupId
+    ]
+    targetResourceName: replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)
+    targetResourceGroup: replace(replace(target.targetResourceGroup, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)
+    metricName: 'HealthCheckStatus'
+    description: replace(replace(target.description, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)
+    customTags: union(commonTags, {
+      AlertType: 'HealthCheck'
+      Environment: '${environmentType}${environmentNumber}'
+    })
+  }
+}]
+
+module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule in appInsightsQueryRules: {
   name: 'appInsightsQuery-${rule.nameSuffix}-${environmentType}${environmentNumber}'
   params: {
     actionGroupId: genericActionGroup.outputs.actionGroupId

@@ -17,7 +17,7 @@ This folder contains the shared alerting infrastructure for EPR. The deployment 
 
 | Alert Type | Primary File(s) To Edit | Notes |
 | --- | --- | --- |
-| Health check metric alerts (Web Apps / Function Apps) | `data/healthcheck-targets.json` | Add or update target entries; `main.bicep` loops this file into metric alert module deployments. |
+| Health check metric alerts (Web Apps / Function Apps) | `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json` | Add or update target entries; `main.bicep` loops these files into metric alert module deployments. |
 | Key Vault secret/certificate lifecycle alerts | `data/keyvault-event-subscriptions.json` | Add event subscription definitions (event type, severity, name suffix) routed through MonitorAlert destination to the generic action group. |
 | ACR vulnerability log query alerts | `data/acr-vulnerability-query-rules.json` | Add scheduled query rule objects (name suffix, severity, KQL query). |
 | Generic notification routing (shared for all above) | `modules/actionGroup/generic.bicep` and `modules/logicApp/slack-commonAlertSchema.bicep` | Only edit when changing how alerts are delivered (for example receiver behavior or Slack message formatting). |
@@ -67,7 +67,7 @@ This folder contains the shared alerting infrastructure for EPR. The deployment 
 
 - Health check metric alerts for web targets
   - Module implementation: `modules/metricAlert/healthCheck-webApp.bicep`
-  - Data: `data/healthcheck-targets.json`
+  - Data: `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json`
 
 ### Log Alerts (ACR Vulnerabilities)
 
@@ -79,7 +79,7 @@ This folder contains the shared alerting infrastructure for EPR. The deployment 
 
 The deployment uses JSON data files for repeatable alert definitions:
 
-- `data/healthcheck-targets.json`
+- `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json`
   - Defines target resource names/resource groups and description for health alerts.
 
 - `data/keyvault-event-subscriptions.json`
@@ -87,6 +87,23 @@ The deployment uses JSON data files for repeatable alert definitions:
 
 - `data/acr-vulnerability-query-rules.json`
   - Defines KQL query rules, severities, and naming for ACR vulnerability alerts.
+
+## Healthcheck Token Placeholders
+
+Healthcheck target files support simple placeholder tokens, replaced in `main.bicep` before deployment:
+
+- `{ENV}`: environment type (example: `DEV`)
+- `{ENV_NO}`: environment number (example: `1`)
+
+Example:
+
+- `"targetName": "{ENV}RWDWEBWA{ENV_NO}401"`
+- `"description": "Health check for {ENV}RWDWEBWA{ENV_NO}401 dropped below 100% in the last 5 minutes"`
+
+Important:
+
+- Keep naming patterns consistent with existing deployed resources to avoid accidental creates (for example `WEBWA` vs `WEBW`, `WEBFA` vs `WEBF`).
+- If a value does not vary by environment (for example a fixed resource group), keep it as a literal string.
 
 ## How To Add A New Alert Hooked To The Generic Action Group
 
@@ -99,7 +116,7 @@ Use one of these patterns depending on alert type.
 3. Run validate/what-if/deploy.
 
 Examples:
-- New health check target: add an object in `data/healthcheck-targets.json`.
+- New health check target: add an object in `data/platform/healthcheck-targets.json` or `data/team1/healthcheck-targets.json`.
 - New Key Vault event: add an object in `data/keyvault-event-subscriptions.json`.
 - New ACR query rule: add an object in `data/acr-vulnerability-query-rules.json`.
 

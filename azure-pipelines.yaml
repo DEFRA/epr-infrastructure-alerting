@@ -28,7 +28,7 @@ stages:
           - template: templates/validate-and-whatif.yaml
             parameters:
               adoEnvironment: DEV1
-              bicepParameters: dev.bicepparam
+              bicepParameters: dev1.bicepparam
               connectedServiceNameARM: $(serviceNameARMDEV1)
               resourceGroupName: DEVRWDINFRG1401
 
@@ -86,7 +86,7 @@ stages:
         parameters:
           jobName: Deploy_DEV1
           adoEnvironment: DEV1
-          bicepParameters: dev.bicepparam
+          bicepParameters: dev1.bicepparam
           connectedServiceNameARM: $(serviceNameARMDEV1)
           deploymentName: DEV1
           resourceGroupName: DEVRWDINFRG1401
