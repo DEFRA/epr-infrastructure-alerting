@@ -6,7 +6,8 @@ param environmentType string
 param keyVaultName string
 param location string = resourceGroup().location
 param logAnalyticsWorkspaceName string
-param slackPlatformSecretName string
+param slackWebhookPlatform string
+param slackWebhookTeam1 string
 
 var appInsightsQueryRules = concat(
   loadJsonContent('./data/team1/appinsights-query-rules.json')
@@ -33,7 +34,7 @@ module genericSlackLogicApps './modules/logicApp/slack-commonAlertSchema.bicep' 
   params: {
     workflowName: 'SlackChannel-CommonAlertSchema'
     location: location
-    slackWebhookUrl: platformSecretsKeyVault.getSecret(slackPlatformSecretName)
+    slackWebhookUrl: platformSecretsKeyVault.getSecret(slackWebhookPlatform)
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
     })
@@ -82,14 +83,14 @@ module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule i
     })
     displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
     description: rule.description
-    evaluationFrequency: 'PT1H'
+    evaluationFrequency: 'PT24H'
     query: rule.query
     scopeResourceId: logAnalyticsWorkspace.id
     severity: rule.severity
     targetResourceTypes: [
       'Microsoft.ContainerRegistry/registries'
     ]
-    windowSize: 'PT1H'
+    windowSize: 'PT24H'
   }
 }]
 
