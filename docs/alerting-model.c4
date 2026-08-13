@@ -239,10 +239,34 @@ model {
         description "Generic action group used by current alert routes"
       }
 
-      genericSlackLogicApp = container "Common Alert Schema Slack Logic App" {
+      genericSlackLogicApp = container "SlackChannel-CommonAlertSchema (Legacy)" {
         icon azure:logic-apps
         technology "Microsoft.Logic/workflows"
         description "Handles alerts following the Azure Monitor Common Alert Schema and posts formatted messages to Slack"
+      }
+
+      genericSlackLogicAppV2 = container "SlackChannel-Processor-CommonAlertSchema" {
+        icon azure:logic-apps
+        technology "Microsoft.Logic/workflows"
+        description "Transforms Common Alert Schema into router payload format and forwards to the team router logic app"
+      }
+
+      teamRouterLogicApp = container "SlackChannel-Router" {
+        icon azure:logic-apps
+        technology "Microsoft.Logic/workflows"
+        description "Accepts {team, payload} requests and routes payload to the correct channel interface logic app"
+      }
+
+      teamPlatformChannelInterfaceLogicApp = container "SlackChannel-Interface-platform" {
+        icon azure:logic-apps
+        technology "Microsoft.Logic/workflows"
+        description "Pass-through channel interface that posts incoming payload directly to the platform Slack webhook"
+      }
+
+      team1ChannelInterfaceLogicApp = container "SlackChannel-Interface-team1" {
+        icon azure:logic-apps
+        technology "Microsoft.Logic/workflows"
+        description "Pass-through channel interface that posts incoming payload directly to the Team1 Slack webhook"
       }
 
       genericEmailReceiver = component "Email Receiver" {
@@ -303,6 +327,10 @@ model {
   pipeline -> acrVulnerabilityScheduledAlertCurrent "Deploys"
   pipeline -> alertingPlatform.genericActionGroup "Deploys"
   pipeline -> alertingPlatform.genericSlackLogicApp "Deploys"
+  pipeline -> alertingPlatform.genericSlackLogicAppV2 "Deploys"
+  pipeline -> alertingPlatform.teamRouterLogicApp "Deploys"
+  pipeline -> alertingPlatform.teamPlatformChannelInterfaceLogicApp "Deploys"
+  pipeline -> alertingPlatform.team1ChannelInterfaceLogicApp "Deploys"
 
   acrContainerRegistryCurrent -> acrDefenderForCloudCurrent "Images scanned by"
   acrDefenderForCloudCurrent -> acrLogAnalyticsWorkspaceCurrent "Exports findings via Continuous Export"
@@ -316,10 +344,16 @@ model {
   webAppHealthCurrent -> webAppHealthMetricAlertCurrent "Publishes health metrics"
   functionAppHealthMetricAlertCurrent -> azureMonitorEvaluation.azureMonitor "Evaluated by"
   webAppHealthMetricAlertCurrent -> azureMonitorEvaluation.azureMonitor "Evaluated by"
-  alertingPlatform.genericActionGroup -> alertingPlatform.genericSlackLogicApp "Invokes"
+  alertingPlatform.genericActionGroup -> alertingPlatform.genericSlackLogicAppV2 "Invokes"
   alertingPlatform.genericActionGroup -> alertingPlatform.genericEmailReceiver
   alertingPlatform.genericActionGroup -> alertingPlatform.genericWebhookReceiver
-  alertingPlatform.genericSlackLogicApp -> slackWorkspace "Posts message via incoming webhook"
+  alertingPlatform.genericSlackLogicApp -> slackWorkspace "Posts message via incoming webhook (legacy path)"
+  alertingPlatform.genericSlackLogicAppV2 -> alertingPlatform.teamRouterLogicApp "Forwards router payload"
+  eprTeams -> alertingPlatform.teamRouterLogicApp "Sends team and payload request"
+  alertingPlatform.teamRouterLogicApp -> alertingPlatform.teamPlatformChannelInterfaceLogicApp "Routes payload when team = platform or not supplied"
+  alertingPlatform.teamRouterLogicApp -> alertingPlatform.team1ChannelInterfaceLogicApp "Routes payload when team=team1"
+  alertingPlatform.teamPlatformChannelInterfaceLogicApp -> slackWorkspace "Posts payload via platform webhook"
+  alertingPlatform.team1ChannelInterfaceLogicApp -> slackWorkspace "Posts payload via Team1 webhook"
 }
 
 views {

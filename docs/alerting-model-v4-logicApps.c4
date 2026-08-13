@@ -1,0 +1,78 @@
+views {
+  view v4LogicApps {
+    title "Alerting Logic Apps"
+    description "Current logic app relationships: ActionGroup-Generic -> SlackChannel-Processor-CommonAlertSchema -> SlackChannel-Router -> SlackChannel-Interface-platform or SlackChannel-Interface-team1."
+
+    include azurePlatform
+    include externalAlerting
+    include azurePlatform.alertingPlatform
+    include azurePlatform.alertingPlatform.genericActionGroup
+    include azurePlatform.alertingPlatform.genericSlackLogicAppV2
+    include azurePlatform.alertingPlatform.teamRouterLogicApp
+    include azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp
+    include azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp
+    include externalAlerting.slackWorkspace
+
+    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericSlackLogicAppV2 with {
+      color primary
+      line solid
+    }
+    include azurePlatform.alertingPlatform.genericSlackLogicAppV2 -> azurePlatform.alertingPlatform.teamRouterLogicApp with {
+      color primary
+      line solid
+    }
+
+    include azurePlatform.alertingPlatform.teamRouterLogicApp -> azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp with {
+      color amber
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamRouterLogicApp -> azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp with {
+      color green
+      line solid
+    }
+
+    include azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp -> externalAlerting.slackWorkspace with {
+      color amber
+      line solid
+    }
+    include azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp -> externalAlerting.slackWorkspace with {
+      color green
+      line solid
+    }
+
+    style azurePlatform {
+      color indigo
+      opacity 12%
+      border solid
+    }
+    style externalAlerting {
+      color amber
+      opacity 16%
+      border solid
+    }
+    style azurePlatform.alertingPlatform {
+      color secondary
+      opacity 12%
+      border solid
+    }
+
+    style azurePlatform.alertingPlatform.genericActionGroup {
+      color secondary
+    }
+    style azurePlatform.alertingPlatform.genericSlackLogicAppV2 {
+      color primary
+    }
+    style azurePlatform.alertingPlatform.teamRouterLogicApp {
+      color indigo
+    }
+    style azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp {
+      color amber
+    }
+    style azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp {
+      color green
+    }
+    style externalAlerting.slackWorkspace {
+      color gray
+    }
+  }
+}

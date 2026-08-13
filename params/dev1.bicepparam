@@ -5,5 +5,7 @@ param environmentNumber = '1'
 param environmentType = 'DEV'
 param keyVaultName = 'DEVRWDINFKV1401'
 param logAnalyticsWorkspaceName = 'DEVRWDINFLA1401'
-param slackWebhookPlatform = 'slack-webhook-epr-alerts-platform-non-prod'
-param slackWebhookTeam1 = 'slack-webhook-epr-alerts-team1-non-prod'
+param channelInterfaces = {
+	platform: 'slack-webhook-epr-alerts-platform-non-prod'
+	team1: 'slack-webhook-epr-alerts-team1-non-prod'
+}

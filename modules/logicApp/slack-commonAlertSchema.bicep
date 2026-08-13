@@ -1,7 +1,7 @@
 param workflowName string
 param location string
 @secure()
-param slackWebhookUrl string
+param routerCallbackUrl string
 param customTags object = {}
 
 resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
@@ -14,7 +14,7 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
       '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
       contentVersion: '1.0.0.0'
       parameters: {
-        slackWebhookUrl: {
+        routerCallbackUrl: {
           type: 'SecureString'
         }
       }
@@ -90,6 +90,18 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
           type: 'Compose'
           inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'customProperties\']?[\'runbookUrl\'], \'\')))}'
           runAfter: {}
+        }
+        Get_Team: {
+          type: 'Compose'
+          inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'customProperties\']?[\'team\'], \'\')))}'
+          runAfter: {}
+        }
+        Get_Routing_Team: {
+          type: 'Compose'
+          inputs: '@{if(empty(outputs(\'Get_Team\')), \'platform\', toLower(outputs(\'Get_Team\')))}'
+          runAfter: {
+            Get_Team: [ 'Succeeded' ]
+          }
         }
         Get_Runbook_Button_Url: {
           type: 'Compose'
@@ -247,28 +259,56 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             Append_Divider: [ 'Succeeded' ]
           }
         }
-        Post_To_Slack: {
-          type: 'Http'
+        Build_Router_Payload: {
+          type: 'Compose'
           inputs: {
-            method: 'POST'
-            uri: '@parameters(\'slackWebhookUrl\')'
-            headers: {
-              'Content-Type': 'application/json'
-            }
-            body: {
+            team: '@{outputs(\'Get_Routing_Team\')}'
+            payload: {
               blocks: '@{variables(\'SlackBlocks\')}'
             }
           }
           runAfter: {
             Append_Action_Buttons: [ 'Succeeded' ]
+            Get_Routing_Team: [ 'Succeeded' ]
+          }
+        }
+        Forward_To_Router: {
+          type: 'Http'
+          inputs: {
+            method: 'POST'
+            uri: '@parameters(\'routerCallbackUrl\')'
+            headers: {
+              'Content-Type': 'application/json'
+            }
+            body: '@outputs(\'Build_Router_Payload\')'
+          }
+          runAfter: {
+            Build_Router_Payload: [ 'Succeeded' ]
+          }
+        }
+        Return_Accepted: {
+          type: 'Response'
+          kind: 'Http'
+          inputs: {
+            statusCode: 202
+            headers: {
+              'Content-Type': 'application/json'
+            }
+            body: {
+              status: 'Forwarded'
+              team: '@{outputs(\'Get_Routing_Team\')}'
+            }
+          }
+          runAfter: {
+            Forward_To_Router: [ 'Succeeded' ]
           }
         }
       }
       outputs: {}
     }
     parameters: {
-      slackWebhookUrl: {
-        value: slackWebhookUrl
+      routerCallbackUrl: {
+        value: routerCallbackUrl
       }
     }
   }

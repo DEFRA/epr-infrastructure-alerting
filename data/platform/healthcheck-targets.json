@@ -2,11 +2,13 @@
     {
         "targetName": "{ENV}RWDWEBWA{ENV_NO}401",
         "targetResourceGroup": "{ENV}RWDWEBRG{ENV_NO}401",
-        "description": "Health check for {ENV}RWDWEBWA{ENV_NO}401 dropped below 100% in the last 5 minutes"
+        "description": "Health check for {ENV}RWDWEBWA{ENV_NO}401 dropped below 100% in the last 5 minutes",
+        "team": "platform"
     },
     {
         "targetName": "{ENV}RWDWEBWA{ENV_NO}402",
         "targetResourceGroup": "{ENV}RWDWEBRG{ENV_NO}401",
-        "description": "Health check for {ENV}RWDWEBWA{ENV_NO}402 dropped below 100% in the last 5 minutes"
+        "description": "Health check for {ENV}RWDWEBWA{ENV_NO}402 dropped below 100% in the last 5 minutes",
+        "team": "platform"
     }
 ]

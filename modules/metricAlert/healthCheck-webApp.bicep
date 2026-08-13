@@ -5,6 +5,7 @@ param targetResourceName string
 param targetResourceGroup string = ''
 param targetResourceRegion string = resourceGroup().location
 param targetResourceType string = 'Microsoft.Web/sites'
+param team string
 param metricName string = 'HealthCheckStatus'
 param threshold int = 100
 param severity int = 2
@@ -22,6 +23,7 @@ resource healthCheckAlert 'Microsoft.Insights/metricAlerts@2024-03-01-preview' =
       actionGroupId: id
       webHookProperties: {
         runbookUrl: 'This is a test of custom webhook properties for resource: ${targetResourceName}'
+        team: team
       }
     }]
     autoMitigate: true
