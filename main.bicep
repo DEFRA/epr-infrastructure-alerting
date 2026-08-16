@@ -100,34 +100,6 @@ module systemTopic './modules/systemTopic.bicep' = {
   }
 }
 
-module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/platform/acr-vulnerability-query-rules.json'): {
-  name: 'acrVulnerability-${rule.nameSuffix}-${environmentType}${environmentNumber}'
-  params: {
-    actionGroupId: genericActionGroup.outputs.actionGroupId
-    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
-    customProperties: {
-      AlertCategory: 'Security'
-      SignalSource: 'DefenderForCloud'
-      runbookUrl: rule.runbookUrl
-      team: rule.team
-    }
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-      AlertType: 'AcrVulnerability'
-    })
-    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
-    description: rule.description
-    evaluationFrequency: 'P1D'
-    query: rule.query
-    scopeResourceId: logAnalyticsWorkspace.id
-    severity: rule.severity
-    targetResourceTypes: [
-      'Microsoft.ContainerRegistry/registries'
-    ]
-    windowSize: 'P1D'
-  }
-}]
-
 module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for eventSubscription in loadJsonContent('./data/platform/keyvault-event-subscriptions.json'): {
   params: {
     actionGroupResourceIds: [
@@ -141,9 +113,38 @@ module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for even
   }
 }]
 
-module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in healthcheckTargets: {
+module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/platform/acr-vulnerability-query-rules.json'): {
+  name: 'acrVulnerability-${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
   params: {
-    alertName: 'HealthCheckAlert-${replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)}'
+    actionGroupId: genericActionGroup.outputs.actionGroupId
+    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+    customProperties: {
+      AlertCategory: 'Security'
+      SignalSource: 'DefenderForCloud'
+      runbookUrl: rule.runbookUrl
+      team: rule.team
+    }
+    customTags: union(commonTags, {
+      Environment: '${environmentType}${environmentNumber}'
+      AlertType: 'AcrVulnerability'
+    })
+    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+    description: rule.description
+    evaluationFrequency: 'P1D'
+    query: rule.query
+    scopeResourceId: logAnalyticsWorkspace.id
+    severity: rule.severity
+    targetResourceTypes: [
+      'Microsoft.ContainerRegistry/registries'
+    ]
+    windowSize: 'P1D'
+  }
+}]
+
+module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in healthcheckTargets: {
+  name: 'healthCheckAlert-${replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)}-${target.team}'
+  params: {
+    alertName: 'HealthCheckAlert-${replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)}-${target.team}'
     actionGroupIds: [
       genericActionGroup.outputs.actionGroupId
     ]
@@ -160,10 +161,10 @@ module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for
 }]
 
 module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule in appInsightsQueryRules: {
-  name: 'appInsightsQuery-${rule.nameSuffix}-${environmentType}${environmentNumber}'
+  name: 'appInsightsQuery-${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
   params: {
     actionGroupId: genericActionGroup.outputs.actionGroupId
-    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
     customProperties: {
       AlertCategory: 'Application'
       SignalSource: 'AppInsights'
@@ -174,7 +175,7 @@ module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule i
       Environment: '${environmentType}${environmentNumber}'
       AlertType: 'AppInsightsQuery'
     })
-    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}'
+    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
     description: rule.description
     evaluationFrequency: rule.evaluationFrequency
     query: rule.query
