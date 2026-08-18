@@ -28,7 +28,7 @@ jobs:
                 connectedServiceNameARM: ${{ parameters.connectedServiceNameARM }}
                 scriptType: bash
                 scriptLocation: inlineScript
-                workingDirectory: shared-infra/alerting
+                workingDirectory: .
                 inlineScript: |
                   az deployment group create \
                     --mode Incremental \
