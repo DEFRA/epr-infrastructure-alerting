@@ -21,6 +21,9 @@ concurrency:
 jobs:
   build-pages:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,14 +32,18 @@ jobs:
         id: pages
         uses: actions/configure-pages@v4
 
-      - name: Build
-        uses: likec4/actions@v1
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          action: build
-          path: ./docs
-          output: dist
-          base: ${{ steps.pages.outputs.base_path }}
-          likec4-version: 1.59.2
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build -- --base "${{ steps.pages.outputs.base_path }}" --output ../dist
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
