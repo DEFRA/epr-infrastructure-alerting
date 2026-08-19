@@ -360,6 +360,7 @@ views {
   view index {
     title "Alert Runtime Path v1"
     description "Initial shared-platform design with a common alerting stack across services."
+    autoLayout TopBottom
     include azurePlatform
     include externalAlerting
     include keyVault

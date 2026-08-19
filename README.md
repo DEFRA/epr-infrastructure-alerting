@@ -1,10 +1,10 @@
 # Shared Alerting (Bicep) 🚨
 
-This folder contains the shared alerting infrastructure for EPR. The deployment is driven from `main.bicep` and routes Azure Monitor alerts through a generic Action Group into a Common Alert Schema processor Logic App, then through a team router to team-specific Slack channel interface Logic Apps.
+This repository contains the shared alerting infrastructure for EPR. The deployment is driven from `main.bicep` and routes Azure Monitor alerts through a generic Action Group into a Common Alert Schema processor Logic App, then through a team router to team-specific Slack channel interface Logic Apps.
 
 ## Quick Start 🚀
 
-1. Open `shared-infra/alerting` and review `main.bicep` and `params/dev1.bicepparam`.
+1. From the repository root, review `main.bicep` and `params/dev1.bicepparam`.
 2. Update or add alert definitions in the JSON files under `data/`.
 3. Validate the deployment:
   - `az deployment group validate --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
@@ -21,7 +21,7 @@ This folder contains the shared alerting infrastructure for EPR. The deployment 
 | Key Vault secret/certificate lifecycle alerts | `data/platform/keyvault-event-subscriptions.json` | Add event subscription definitions (event type, severity, name suffix) routed through MonitorAlert destination to the generic action group. |
 | ACR vulnerability log query alerts | `data/platform/acr-vulnerability-query-rules.json` | Add scheduled query rule objects (name suffix, severity, KQL query). |
 | App Insights query alerts | `data/team1/appinsights-query-rules.json` | Add query definitions with `team` and `runbookUrl` custom properties. |
-| Notification processing and routing | `modules/logicApp/slack-commonAlertSchema-v2.bicep`, `modules/logicApp/slack-teamRouter.bicep`, `modules/logicApp/slack-channelInterface.bicep`, `modules/actionGroup/generic.bicep` | Edit when changing alert payload formatting, routing, or Slack channel delivery behavior. |
+| Notification processing and routing | `modules/logicApp/slack-commonAlertSchema.bicep`, `modules/logicApp/slack-router.bicep`, `modules/logicApp/slack-channelInterface.bicep`, `modules/actionGroup/generic.bicep` | Edit when changing alert payload formatting, routing, or Slack channel delivery behavior. |
 | Deployment parameters (environment-specific names and channel mappings) | `params/dev1.bicepparam`, `params/tst1.bicepparam` | Update Key Vault and Log Analytics names/resource groups and `channelInterfaces` secret-name mappings per environment. |
 
 ## Entry Point 📍
@@ -35,7 +35,7 @@ This folder contains the shared alerting infrastructure for EPR. The deployment 
 `main.bicep` orchestrates all resources and modules in this order:
 
 1. References an existing Log Analytics workspace.
-2. Deploys the Common Alert Schema processor Logic App (`slack-commonAlertSchema-v2`).
+2. Deploys the Common Alert Schema processor Logic App (`slack-commonAlertSchema`).
 3. Deploys Slack channel interface Logic Apps for platform and team1.
 4. Deploys the team router Logic App and wires interface callback URLs.
 5. Deploys a generic Action Group wired to the processor Logic App callback URL.
@@ -49,11 +49,11 @@ This folder contains the shared alerting infrastructure for EPR. The deployment 
 ### Notification and Routing 🔁
 
 - Common Alert Schema processor Logic App
-  - File: `modules/logicApp/slack-commonAlertSchema-v2.bicep`
+  - File: `modules/logicApp/slack-commonAlertSchema.bicep`
   - Purpose: receives Common Alert Schema payloads, builds a router payload of shape `{ team, payload }`, and forwards to router.
 
 - Team router Logic App
-  - File: `modules/logicApp/slack-teamRouter.bicep`
+  - File: `modules/logicApp/slack-router.bicep`
   - Purpose: routes payloads to channel interface Logic Apps based on team (defaults to platform).
 
 - Channel interface Logic Apps
@@ -119,7 +119,7 @@ Parameter-driven channel mapping 🗺️:
 - Values are Key Vault secret names containing Slack webhook URLs.
 - Configure per environment in bicepparam files.
 
-## Healthcheck Token Placeholders 🏷️
+## Health Check Token Placeholders 🏷️
 
 Healthcheck target files support simple placeholder tokens, replaced in `main.bicep` before deployment:
 
@@ -174,7 +174,7 @@ Key wiring in `main.bicep`:
 
 ## Local Validation And Deployment ✅
 
-From `shared-infra/alerting`:
+From the repository root:
 
 - Validate:
   - `az deployment group validate --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
@@ -194,7 +194,12 @@ From `shared-infra/alerting`:
 
 These run validate, what-if, and create against the target resource group/environment.
 
+Current pipeline scope:
+
+- DEV1 validate/deploy stages are enabled.
+- Additional environment stages are present but commented out in `azure-pipelines.yaml`.
+
 ## Troubleshooting Notes 🛠️
 
 - If what-if fails with `NoRegisteredProviderFound` for `metricalerts` and an unsupported API version (for example `2026-01-01`), check the API version in alert modules/resources and use a supported version for your target subscription/region.
-- Keep `main.bicep` as source of truth. `main.json` is a compiled artifact and should not be manually edited.
+- Keep `main.bicep` as source of truth. Do not manually author compiled ARM JSON artifacts in this repo.

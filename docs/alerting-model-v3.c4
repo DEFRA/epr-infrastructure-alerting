@@ -2,6 +2,7 @@ views {
   view v3 {
     title "Alert Runtime Path v3"
     description "Current-state design consolidated back into a single alerting platform with generic routing components."
+    autoLayout TopBottom
     include azurePlatform
     include externalAlerting
     include azurePlatform.acrAlertPathCurrent

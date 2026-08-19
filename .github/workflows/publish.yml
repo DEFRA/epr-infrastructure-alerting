@@ -36,7 +36,7 @@ jobs:
           path: ./docs
           output: dist
           base: ${{ steps.pages.outputs.base_path }}
-          likec4-version: latest
+          likec4-version: 1.59.2
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

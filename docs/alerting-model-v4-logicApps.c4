@@ -2,6 +2,7 @@ views {
   view v4LogicApps {
     title "Alerting Logic Apps"
     description "Current logic app relationships: ActionGroup-Generic -> SlackChannel-Processor-CommonAlertSchema -> SlackChannel-Router -> SlackChannel-Interface-platform or SlackChannel-Interface-team1."
+    autoLayout TopBottom
 
     include azurePlatform
     include externalAlerting

@@ -10,6 +10,6 @@
     "preview": "likec4 preview ."
   },
   "devDependencies": {
-    "likec4": "^1.59.2"
+    "likec4": "1.59.2"
   }
 }

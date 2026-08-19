@@ -2,6 +2,7 @@ views {
   view v2 {
     title "Alert Runtime Path v2"
     description "Per-team stack design with type-specific action groups and logic apps for each alert path."
+    autoLayout TopBottom
     include azurePlatform
     include externalAlerting
     include azurePlatform.containerRegistry
