@@ -1,0 +1,77 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  poolNONPROD: DEFRA-COMMON-UBUNTU-SSV3
+  poolPROD: DEFRA-COMMON-UBUNTU-SSV5
+  serviceNameARMDEV1: AZD-RWD-DEV1
+  serviceNameARMTST1: AZD-RWD-TST1
+  serviceNameARMPRE1: AZR-RWD-PRE1
+  serviceNameARMPRE2: AZR-RWD-PRE2
+  serviceNameARMPRD1: AZR-RWD-PRD1
+
+stages:
+  - stage: Validate_Stage
+    displayName: Validate & What-If
+    jobs:
+      - job: Validate_DEV1
+        displayName: DEV1 Valid
+        pool: $(poolNONPROD)
+        steps:
+          - template: templates/validate-and-whatif.yaml
+            parameters:
+              adoEnvironment: DEV1
+              bicepParameters: dev1.bicepparam
+              connectedServiceNameARM: $(serviceNameARMDEV1)
+              resourceGroupName: DEVRWDINFRG1401
+
+      # - job: Validate_TST1
+      #   displayName: TST1 Valid
+      #   pool: $(poolNONPROD)
+      #   steps:
+      #     - template: templates/validate-and-whatif.yaml
+      #       parameters:
+      #         adoEnvironment: TST1
+      #         bicepParameters: tst1.bicepparam
+      #         connectedServiceNameARM: $(serviceNameARMTST1)
+      #         resourceGroupName: TSTRWDINFRG1401
+
+      # - job: Validate_PRE1
+      #   displayName: PRE1 Valid
+      #   pool: $(poolPROD)
+      #   steps:
+      #     - template: templates/validate-and-whatif.yaml
+      #       parameters:
+      #         adoEnvironment: PRE1
+      #         bicepParameters: pre1.bicepparam
+      #         connectedServiceNameARM: $(serviceNameARMPRE1)
+      #         resourceGroupName: PRERWDINFRG1401
+
+      # - job: Validate_PRE2
+      #   displayName: PRE2 Valid
+      #   pool: $(poolPROD)
+      #   steps:
+      #     - template: templates/validate-and-whatif.yaml
+      #       parameters:
+      #         adoEnvironment: PRE2
+      #         bicepParameters: pre2.bicepparam
+      #         connectedServiceNameARM: $(serviceNameARMPRE2)
+      #         resourceGroupName: PRERWDINFRG2401
+
+      # - job: Validate_PRD1
+      #   displayName: PRD1 Valid
+      #   pool: $(poolPROD)
+      #   steps:
+      #     - template: templates/validate-and-whatif.yaml
+      #       parameters:
+      #         adoEnvironment: PRD1
+      #         bicepParameters: prd1.bicepparam
+      #         connectedServiceNameARM: $(serviceNameARMPRD1)
+      #         resourceGroupName: PRDRWDINFRG1401
