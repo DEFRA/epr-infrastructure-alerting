@@ -203,3 +203,5 @@ Current pipeline scope:
 
 - If what-if fails with `NoRegisteredProviderFound` for `metricalerts` and an unsupported API version (for example `2026-01-01`), check the API version in alert modules/resources and use a supported version for your target subscription/region.
 - Keep `main.bicep` as source of truth. Do not manually author compiled ARM JSON artifacts in this repo.
+
+
