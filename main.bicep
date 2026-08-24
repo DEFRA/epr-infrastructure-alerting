@@ -12,9 +12,12 @@ var appInsightsQueryRules = concat(
   loadJsonContent('./data/team1/appinsights-query-rules.json')
 )
 
+var environmentKey = '${environmentType}${environmentNumber}'
+var platformHealthcheckTargetsByEnvironment = loadJsonContent('./data/platform/healthcheck-targets.json')
+var team1HealthcheckTargetsByEnvironment = loadJsonContent('./data/team1/healthcheck-targets.json')
 var healthcheckTargets = concat(
-  loadJsonContent('./data/platform/healthcheck-targets.json'),
-  loadJsonContent('./data/team1/healthcheck-targets.json')
+  platformHealthcheckTargetsByEnvironment[?environmentKey] ?? [],
+  team1HealthcheckTargetsByEnvironment[?environmentKey] ?? []
 )
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
@@ -31,7 +34,7 @@ resource platformSecretsKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing
 
 module commonAlertSchemaProcessor './modules/logicApp/slack-commonAlertSchema.bicep' = {
   params: {
-    workflowName: 'SlackChannel-Processor-CommonAlertSchema'
+    workflowName: 'SlackChannel-Processor-CommonAlertSchema-${environmentType}${environmentNumber}'
     location: location
     routerCallbackUrl: slackChannelRouter.outputs.manualTriggerCallbackUrl
     customTags: union(commonTags, {
@@ -42,7 +45,7 @@ module commonAlertSchemaProcessor './modules/logicApp/slack-commonAlertSchema.bi
 
 module slackChannelInterfacePlatform './modules/logicApp/slack-channelInterface.bicep' = {
   params: {
-    workflowName: 'SlackChannel-Interface-platform'
+    workflowName: 'SlackChannel-Interface-Platform-${environmentType}${environmentNumber}'
     location: location
     slackWebhookUrl: platformSecretsKeyVault.getSecret(channelInterfaces.platform)
     customTags: union(commonTags, {
@@ -53,7 +56,7 @@ module slackChannelInterfacePlatform './modules/logicApp/slack-channelInterface.
 
 module slackChannelInterfaceTeam1 './modules/logicApp/slack-channelInterface.bicep' = {
   params: {
-    workflowName: 'SlackChannel-Interface-team1'
+    workflowName: 'SlackChannel-Interface-Team1-${environmentType}${environmentNumber}'
     location: location
     slackWebhookUrl: platformSecretsKeyVault.getSecret(channelInterfaces.team1)
     customTags: union(commonTags, {
@@ -64,7 +67,7 @@ module slackChannelInterfaceTeam1 './modules/logicApp/slack-channelInterface.bic
 
 module slackChannelRouter './modules/logicApp/slack-router.bicep' = {
   params: {
-    workflowName: 'SlackChannel-Router'
+    workflowName: 'SlackChannel-Router-${environmentType}${environmentNumber}'
     location: location
     platformCallbackUrl: slackChannelInterfacePlatform.outputs.manualTriggerCallbackUrl
     team1CallbackUrl: slackChannelInterfaceTeam1.outputs.manualTriggerCallbackUrl
@@ -76,7 +79,7 @@ module slackChannelRouter './modules/logicApp/slack-router.bicep' = {
 
 module genericActionGroup './modules/actionGroup/generic.bicep' = {
   params: {
-    actionGroupName: 'ActionGroup-Generic'
+    actionGroupName: 'ActionGroup-Generic-${environmentType}${environmentNumber}'
     groupShortName: 'TeamAlerts'
     workflowResourceId: commonAlertSchemaProcessor.outputs.workflowResourceId
     workflowCallbackUrl: commonAlertSchemaProcessor.outputs.manualTriggerCallbackUrl
@@ -114,10 +117,10 @@ module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for even
 }]
 
 module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/platform/acr-vulnerability-query-rules.json'): {
-  name: 'acrVulnerability-${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+  name: 'acrVulnerability-${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
   params: {
     actionGroupId: genericActionGroup.outputs.actionGroupId
-    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+    alertName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
     customProperties: {
       AlertCategory: 'Security'
       SignalSource: 'DefenderForCloud'
@@ -128,7 +131,7 @@ module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule i
       Environment: '${environmentType}${environmentNumber}'
       AlertType: 'AcrVulnerability'
     })
-    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+    displayName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
     description: rule.description
     evaluationFrequency: 'P1D'
     query: rule.query
@@ -142,9 +145,9 @@ module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule i
 }]
 
 module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in healthcheckTargets: {
-  name: 'healthCheckAlert-${replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)}-${target.team}'
+  name: 'healthCheckAlert-${target.targetName}-${target.team}'
   params: {
-    alertName: 'HealthCheckAlert-${replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)}-${target.team}'
+    alertName: 'HealthCheckAlert-${target.targetName}-${target.team}'
     actionGroupIds: [
       genericActionGroup.outputs.actionGroupId
     ]
@@ -152,19 +155,19 @@ module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for
       AlertType: 'HealthCheck'
       Environment: '${environmentType}${environmentNumber}'
     })
-    description: replace(replace(target.description, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)
+    description: target.description
     metricName: 'HealthCheckStatus'
-    targetResourceName: replace(replace(target.targetName, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)
-    targetResourceGroup: replace(replace(target.targetResourceGroup, '{ENV}', environmentType), '{ENV_NO}', environmentNumber)
+    targetResourceName: target.targetName
+    targetResourceGroup: target.targetResourceGroup
     team: target.team
   }
 }]
 
 module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule in appInsightsQueryRules: {
-  name: 'appInsightsQuery-${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+  name: 'appInsightsQuery-${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
   params: {
     actionGroupId: genericActionGroup.outputs.actionGroupId
-    alertName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+    alertName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
     customProperties: {
       AlertCategory: 'Application'
       SignalSource: 'AppInsights'
@@ -175,7 +178,7 @@ module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule i
       Environment: '${environmentType}${environmentNumber}'
       AlertType: 'AppInsightsQuery'
     })
-    displayName: '${rule.nameSuffix}-${environmentType}${environmentNumber}-${rule.team}'
+    displayName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
     description: rule.description
     evaluationFrequency: rule.evaluationFrequency
     query: rule.query
