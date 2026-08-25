@@ -29,16 +29,16 @@ stages:
               connectedServiceNameARM: $(serviceNameARMDEV1)
               resourceGroupName: DEVRWDINFRG1401
 
-      # - job: Validate_TST1
-      #   displayName: TST1 Valid
-      #   pool: $(poolNONPROD)
-      #   steps:
-      #     - template: templates/validate-and-whatif.yaml
-      #       parameters:
-      #         adoEnvironment: TST1
-      #         bicepParameters: tst1.bicepparam
-      #         connectedServiceNameARM: $(serviceNameARMTST1)
-      #         resourceGroupName: TSTRWDINFRG1401
+      - job: Validate_TST1
+        displayName: TST1 Valid
+        pool: $(poolNONPROD)
+        steps:
+          - template: templates/validate-and-whatif.yaml
+            parameters:
+              adoEnvironment: TST1
+              bicepParameters: tst1.bicepparam
+              connectedServiceNameARM: $(serviceNameARMTST1)
+              resourceGroupName: TSTRWDINFRG1401
 
       # - job: Validate_PRE1
       #   displayName: PRE1 Valid

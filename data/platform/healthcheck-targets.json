@@ -1,14 +1,21 @@
-[
-    {
-        "targetName": "{ENV}RWDWEBWA{ENV_NO}401",
-        "targetResourceGroup": "{ENV}RWDWEBRG{ENV_NO}401",
-        "description": "Health check for {ENV}RWDWEBWA{ENV_NO}401 dropped below 100% in the last 5 minutes",
-        "team": "platform"
-    },
-    {
-        "targetName": "{ENV}RWDWEBWA{ENV_NO}402",
-        "targetResourceGroup": "{ENV}RWDWEBRG{ENV_NO}401",
-        "description": "Health check for {ENV}RWDWEBWA{ENV_NO}402 dropped below 100% in the last 5 minutes",
-        "team": "platform"
-    }
-]
+{
+    "DEV1": [
+        {
+            "targetName": "DEVRWDWEBWA1401",
+            "targetResourceGroup": "DEVRWDWEBRG1401",
+            "description": "Health check for DEVRWDWEBWA1401 dropped below 100% in the last 5 minutes",
+            "team": "Platform"
+        }
+    ],
+    "TST1": [
+        {
+            "targetName": "TSTRWDWEBWA1401",
+            "targetResourceGroup": "TSTRWDWEBRG1401",
+            "description": "Health check for TSTRWDWEBWA1401 dropped below 100% in the last 5 minutes",
+            "team": "Platform"
+        }
+    ],
+    "PRE1": [],
+    "PRE2": [],
+    "PRD1": []
+}

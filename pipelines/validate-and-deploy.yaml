@@ -3,7 +3,14 @@ trigger:
     include:
       - main
 
-pr: none
+pr:
+  branches:
+    include:
+      - main
+
+# Expected behavior:
+# - PRs targeting main run validation and deploy to DEV1 only.
+# - Merges/pushes to main run validation and all deployment stages.
 
 variables:
   poolNONPROD: DEFRA-COMMON-UBUNTU-SSV3
@@ -29,16 +36,16 @@ stages:
               connectedServiceNameARM: $(serviceNameARMDEV1)
               resourceGroupName: DEVRWDINFRG1401
 
-      # - job: Validate_TST1
-      #   displayName: TST1 Valid
-      #   pool: $(poolNONPROD)
-      #   steps:
-      #     - template: templates/validate-and-whatif.yaml
-      #       parameters:
-      #         adoEnvironment: TST1
-      #         bicepParameters: tst1.bicepparam
-      #         connectedServiceNameARM: $(serviceNameARMTST1)
-      #         resourceGroupName: TSTRWDINFRG1401
+      - job: Validate_TST1
+        displayName: TST1 Valid
+        pool: $(poolNONPROD)
+        steps:
+          - template: templates/validate-and-whatif.yaml
+            parameters:
+              adoEnvironment: TST1
+              bicepParameters: tst1.bicepparam
+              connectedServiceNameARM: $(serviceNameARMTST1)
+              resourceGroupName: TSTRWDINFRG1401
 
       # - job: Validate_PRE1
       #   displayName: PRE1 Valid
@@ -88,20 +95,20 @@ stages:
           deploymentName: DEV1
           resourceGroupName: DEVRWDINFRG1401
 
-  # - stage: Deploy_TST1
-  #   displayName: Deploy to TST1
-  #   dependsOn: Validate_Stage
-  #   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-  #   pool: $(poolNONPROD)
-  #   jobs:
-  #     - template: templates/deploy-resources.yaml
-  #       parameters:
-  #         jobName: Deploy_TST1
-  #         adoEnvironment: TST1
-  #         bicepParameters: tst1.bicepparam
-  #         connectedServiceNameARM: $(serviceNameARMTST1)
-  #         deploymentName: TST1
-  #         resourceGroupName: TSTRWDINFRG1401
+  - stage: Deploy_TST1
+    displayName: Deploy to TST1
+    dependsOn: Validate_Stage
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    pool: $(poolNONPROD)
+    jobs:
+      - template: templates/deploy-resources.yaml
+        parameters:
+          jobName: Deploy_TST1
+          adoEnvironment: TST1
+          bicepParameters: tst1.bicepparam
+          connectedServiceNameARM: $(serviceNameARMTST1)
+          deploymentName: TST1
+          resourceGroupName: TSTRWDINFRG1401
 
   # - stage: Deploy_PRE1
   #   displayName: Deploy to PRE1
