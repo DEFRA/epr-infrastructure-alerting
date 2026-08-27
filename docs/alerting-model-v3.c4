@@ -11,9 +11,10 @@ views {
     include azurePlatform.healthAlertPathCurrent
     include azurePlatform.azureMonitorEvaluation.azureMonitor
     include azurePlatform.alertingPlatform.genericActionGroup
-    include azurePlatform.alertingPlatform.genericSlackLogicApp
-    include azurePlatform.alertingPlatform.genericEmailReceiver
-    include azurePlatform.alertingPlatform.genericWebhookReceiver
+    include azurePlatform.alertingPlatform.genericSlackLogicAppV2
+    include azurePlatform.alertingPlatform.teamRouterLogicApp
+    include azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp
+    include azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp
     include externalAlerting.slackWorkspace
 
     // ACR vulnerability path (current: generic action group + logic app)
@@ -33,20 +34,28 @@ views {
       color sky
       line solid
     }
-    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericSlackLogicApp with {
+    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericSlackLogicAppV2 with {
       color sky
       line solid
     }
-    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericEmailReceiver with {
-      color gray
-      line dotted
-    }
-    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericWebhookReceiver with {
-      color gray
-      line dotted
-    }
-    include azurePlatform.alertingPlatform.genericSlackLogicApp -> externalAlerting.slackWorkspace with {
+    include azurePlatform.alertingPlatform.genericSlackLogicAppV2 -> azurePlatform.alertingPlatform.teamRouterLogicApp with {
       color sky
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamRouterLogicApp -> azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp with {
+      color amber
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamRouterLogicApp -> azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp with {
+      color green
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp -> externalAlerting.slackWorkspace with {
+      color amber
+      line solid
+    }
+    include azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp -> externalAlerting.slackWorkspace with {
+      color green
       line solid
     }
 
@@ -154,14 +163,17 @@ views {
     style azurePlatform.alertingPlatform.genericActionGroup {
       color secondary
     }
-    style azurePlatform.alertingPlatform.genericSlackLogicApp {
-      color muted
+    style azurePlatform.alertingPlatform.genericSlackLogicAppV2 {
+      color primary
     }
-    style azurePlatform.alertingPlatform.genericEmailReceiver {
-      color slate
+    style azurePlatform.alertingPlatform.teamRouterLogicApp {
+      color indigo
     }
-    style azurePlatform.alertingPlatform.genericWebhookReceiver {
-      color slate
+    style azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp {
+      color amber
+    }
+    style azurePlatform.alertingPlatform.team1ChannelInterfaceLogicApp {
+      color green
     }
     style externalAlerting.slackWorkspace {
       color gray
