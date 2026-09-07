@@ -6,7 +6,7 @@ param environmentType string
 param keyVaultName string
 param location string = resourceGroup().location
 param logAnalyticsWorkspaceName string
-param channelInterfaces object
+param channelInterfaces array
 
 var appInsightsQueryRules = concat(
   loadJsonContent('./data/team1/appinsights-query-rules.json')
@@ -43,34 +43,30 @@ module commonAlertSchemaProcessor './modules/logicApp/slack-commonAlertSchema.bi
   }
 }
 
-module slackChannelInterfacePlatform './modules/logicApp/slack-channelInterface.bicep' = {
+module slackChannelInterfaces './modules/logicApp/slack-channelInterface.bicep' = [for (channelInterface, i) in channelInterfaces: {
+  name: 'slackChannelInterface-${channelInterface.team}-${environmentType}${environmentNumber}'
   params: {
-    workflowName: 'SlackChannel-Interface-Platform-${environmentType}${environmentNumber}'
+    workflowName: 'SlackChannel-Interface-${channelInterface.team}-${environmentType}${environmentNumber}'
     location: location
-    slackWebhookUrl: platformSecretsKeyVault.getSecret(channelInterfaces.platform)
+    slackWebhookUrl: platformSecretsKeyVault.getSecret(channelInterface.secretName)
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
     })
   }
-}
+}]
 
-module slackChannelInterfaceTeam1 './modules/logicApp/slack-channelInterface.bicep' = {
-  params: {
-    workflowName: 'SlackChannel-Interface-Team1-${environmentType}${environmentNumber}'
-    location: location
-    slackWebhookUrl: platformSecretsKeyVault.getSecret(channelInterfaces.team1)
-    customTags: union(commonTags, {
-      Environment: '${environmentType}${environmentNumber}'
-    })
-  }
-}
+var teamNames = [for channelInterface in channelInterfaces: channelInterface.team]
+var platformRouteIndex = indexOf(teamNames, 'Platform')
 
 module slackChannelRouter './modules/logicApp/slack-router.bicep' = {
   params: {
     workflowName: 'SlackChannel-Router-${environmentType}${environmentNumber}'
     location: location
-    platformCallbackUrl: slackChannelInterfacePlatform.outputs.manualTriggerCallbackUrl
-    team1CallbackUrl: slackChannelInterfaceTeam1.outputs.manualTriggerCallbackUrl
+    defaultCallbackUrl: slackChannelInterfaces[platformRouteIndex].outputs.manualTriggerCallbackUrl
+    teamRoutes: [for (channelInterface, i) in channelInterfaces: {
+      team: channelInterface.team
+      callbackUrl: slackChannelInterfaces[i].outputs.manualTriggerCallbackUrl
+    }]
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
     })

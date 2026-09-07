@@ -1,9 +1,8 @@
 param workflowName string
 param location string
 @secure()
-param platformCallbackUrl string
-@secure()
-param team1CallbackUrl string
+param defaultCallbackUrl string
+param teamRoutes array
 param customTags object = {}
 
 resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
@@ -16,11 +15,11 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
       '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
       contentVersion: '1.0.0.0'
       parameters: {
-        platformCallbackUrl: {
+        defaultCallbackUrl: {
           type: 'SecureString'
         }
-        team1CallbackUrl: {
-          type: 'SecureString'
+        teamRoutes: {
+          type: 'Array'
         }
       }
       triggers: {
@@ -48,41 +47,64 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
           inputs: '@{toLower(trim(string(coalesce(triggerBody()?[\'team\'], \'\'))))}'
           runAfter: {}
         }
-        Route_To_Team1_If_Match: {
-          type: 'If'
-          expression: '@equals(outputs(\'Resolve_Team\'), \'team1\')'
+        Initialize_CallbackUrl: {
+          type: 'InitializeVariable'
+          inputs: {
+            variables: [
+              {
+                name: 'callbackUrl'
+                type: 'string'
+                value: '@parameters(\'defaultCallbackUrl\')'
+              }
+            ]
+          }
+          runAfter: {
+            Resolve_Team: [
+              'Succeeded'
+            ]
+          }
+        }
+        Resolve_CallbackUrl: {
+          type: 'Foreach'
+          foreach: '@parameters(\'teamRoutes\')'
           actions: {
-            Forward_To_Team1: {
-              type: 'Http'
-              inputs: {
-                method: 'POST'
-                uri: '@parameters(\'team1CallbackUrl\')'
-                headers: {
-                  'Content-Type': 'application/json'
+            Set_CallbackUrl_If_Match: {
+              type: 'If'
+              expression: '@equals(toLower(string(coalesce(item()?[\'team\'], \'\'))), outputs(\'Resolve_Team\'))'
+              actions: {
+                Set_CallbackUrl: {
+                  type: 'SetVariable'
+                  inputs: {
+                    name: 'callbackUrl'
+                    value: '@item()?[\'callbackUrl\']'
+                  }
+                  runAfter: {}
                 }
-                body: '@coalesce(triggerBody()?[\'payload\'], json(\'{}\'))'
+              }
+              else: {
+                actions: {}
               }
               runAfter: {}
             }
           }
-          else: {
-            actions: {
-              Forward_To_Platform: {
-                type: 'Http'
-                inputs: {
-                  method: 'POST'
-                  uri: '@parameters(\'platformCallbackUrl\')'
-                  headers: {
-                    'Content-Type': 'application/json'
-                  }
-                  body: '@coalesce(triggerBody()?[\'payload\'], json(\'{}\'))'
-                }
-                runAfter: {}
-              }
+          runAfter: {
+            Initialize_CallbackUrl: [
+              'Succeeded'
+            ]
+          }
+        }
+        Route_To_Channel: {
+          type: 'Http'
+          inputs: {
+            method: 'POST'
+            uri: '@variables(\'callbackUrl\')'
+            headers: {
+              'Content-Type': 'application/json'
             }
+            body: '@coalesce(triggerBody()?[\'payload\'], json(\'{}\'))'
           }
           runAfter: {
-            Resolve_Team: [
+            Resolve_CallbackUrl: [
               'Succeeded'
             ]
           }
@@ -91,11 +113,11 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
       outputs: {}
     }
     parameters: {
-      platformCallbackUrl: {
-        value: platformCallbackUrl
+      defaultCallbackUrl: {
+        value: defaultCallbackUrl
       }
-      team1CallbackUrl: {
-        value: team1CallbackUrl
+      teamRoutes: {
+        value: teamRoutes
       }
     }
   }
