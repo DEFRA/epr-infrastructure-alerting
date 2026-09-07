@@ -28,7 +28,7 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 
 - Template entry point: `main.bicep`
 - Environment parameters: `params/dev1.bicepparam`, `params/tst1.bicepparam`
-- Pipeline entry point: `azure-pipelines.yaml`
+- Pipeline entry point: `pipelines/validate-and-deploy.yaml`
 
 ## How The Templates Work 🏗️
 
@@ -36,7 +36,7 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 
 1. References an existing Log Analytics workspace.
 2. Deploys the Common Alert Schema processor Logic App (`slack-commonAlertSchema`).
-3. Deploys Slack channel interface Logic Apps for platform and team1.
+3. Deploys Slack channel interface Logic Apps for each entry in `channelInterfaces`.
 4. Deploys the team router Logic App and wires interface callback URLs.
 5. Deploys a generic Action Group wired to the processor Logic App callback URL.
 6. Deploys a Key Vault Event Grid System Topic.
@@ -114,27 +114,25 @@ Custom property routing note 🧠:
 
 Parameter-driven channel mapping 🗺️:
 
-- `channelInterfaces` is an object parameter in `main.bicep`.
-- Keys are team route names (for example `platform`, `team1`).
-- Values are Key Vault secret names containing Slack webhook URLs.
+- `channelInterfaces` is an array parameter in `main.bicep`.
+- Each entry has `team` and `secretName` properties.
+- `team` is the route name (for example `Platform`, `Team1`, `SubmitData`, `ManageAccount`).
+- `secretName` is the Key Vault secret containing the Slack webhook URL.
 - Configure per environment in bicepparam files.
 
-## Health Check Token Placeholders 🏷️
+## Health Check Configuration By Environment 🏷️
 
-Healthcheck target files support simple placeholder tokens, replaced in `main.bicep` before deployment:
+Healthcheck targets are environment-keyed in JSON and selected in `main.bicep` using `${environmentType}${environmentNumber}` (for example `DEV1`, `TST1`).
 
-- `{ENV}`: environment type (example: `DEV`)
-- `{ENV_NO}`: environment number (example: `1`)
+Current data shape:
 
-Example:
-
-- `"targetName": "{ENV}RWDWEBWA{ENV_NO}401"`
-- `"description": "Health check for {ENV}RWDWEBWA{ENV_NO}401 dropped below 100% in the last 5 minutes"`
+- `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json` contain objects keyed by environment (`DEV1`, `TST1`, `PRE1`, `PRE2`, `PRD1`).
+- Each environment key contains an array of target objects (`targetName`, `targetResourceGroup`, `description`, `team`).
 
 Important ⚠️:
 
-- Keep naming patterns consistent with existing deployed resources to avoid accidental creates (for example `WEBWA` vs `WEBW`, `WEBFA` vs `WEBF`).
-- If a value does not vary by environment (for example a fixed resource group), keep it as a literal string.
+- Ensure each environment key exists, even if the value is an empty array.
+- Keep resource names and groups aligned with existing deployed resources to avoid accidental creates.
 
 ## How To Add A New Alert Hooked To The Generic Action Group ➕
 
@@ -187,17 +185,19 @@ From the repository root:
 
 ## CI/CD 🔄
 
-`azure-pipelines.yaml` uses template jobs in `templates/`:
+`pipelines/validate-and-deploy.yaml` uses template jobs in `pipelines/templates/`:
 
-- `templates/validate-and-whatif.yaml`
-- `templates/deploy-resources.yaml`
+- `pipelines/templates/validate-and-whatif.yaml`
+- `pipelines/templates/deploy-resources.yaml`
 
 These run validate, what-if, and create against the target resource group/environment.
 
 Current pipeline scope:
 
-- DEV1 validate/deploy stages are enabled.
-- Additional environment stages are present but commented out in `azure-pipelines.yaml`.
+- Validate jobs are enabled for DEV1 and TST1.
+- Deploy to DEV1 runs on PRs and merges/pushes to `main`.
+- Deploy to TST1 runs on merges/pushes to `main` (not PRs).
+- PRE/PRD stages are present but commented out in `pipelines/validate-and-deploy.yaml`.
 
 ## Troubleshooting Notes 🛠️
 
