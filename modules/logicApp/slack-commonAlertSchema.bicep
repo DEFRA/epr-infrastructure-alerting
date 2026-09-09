@@ -91,16 +91,16 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
           inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'customProperties\']?[\'runbookUrl\'], \'\')))}'
           runAfter: {}
         }
-        Get_Team: {
+        Get_Channel: {
           type: 'Compose'
-          inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'customProperties\']?[\'team\'], \'\')))}'
+          inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'customProperties\']?[\'channel\'], \'\')))}'
           runAfter: {}
         }
-        Get_Routing_Team: {
+        Get_Routing_Channel: {
           type: 'Compose'
-          inputs: '@{if(empty(outputs(\'Get_Team\')), \'platform\', toLower(outputs(\'Get_Team\')))}'
+          inputs: '@{if(empty(outputs(\'Get_Channel\')), \'epr-alerts-platform-non-prod\', toLower(outputs(\'Get_Channel\')))}'
           runAfter: {
-            Get_Team: [ 'Succeeded' ]
+            Get_Channel: [ 'Succeeded' ]
           }
         }
         Get_Runbook_Button_Url: {
@@ -262,14 +262,14 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
         Build_Router_Payload: {
           type: 'Compose'
           inputs: {
-            team: '@{outputs(\'Get_Routing_Team\')}'
+            channelName: '@{outputs(\'Get_Routing_Channel\')}'
             payload: {
               blocks: '@{variables(\'SlackBlocks\')}'
             }
           }
           runAfter: {
             Append_Action_Buttons: [ 'Succeeded' ]
-            Get_Routing_Team: [ 'Succeeded' ]
+            Get_Routing_Channel: [ 'Succeeded' ]
           }
         }
         Forward_To_Router: {
@@ -296,7 +296,7 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             }
             body: {
               status: 'Forwarded'
-              team: '@{outputs(\'Get_Routing_Team\')}'
+              channelName: '@{outputs(\'Get_Routing_Channel\')}'
             }
           }
           runAfter: {

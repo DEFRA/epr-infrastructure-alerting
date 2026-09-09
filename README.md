@@ -1,6 +1,6 @@
 # Shared Alerting (Bicep) 🚨
 
-This repository contains the shared alerting infrastructure for EPR. The deployment is driven from `main.bicep` and routes Azure Monitor alerts through a generic Action Group into a Common Alert Schema processor Logic App, then through a team router to team-specific Slack channel interface Logic Apps.
+This repository contains the shared alerting infrastructure for EPR. The deployment is driven from `main.bicep` and routes Azure Monitor alerts through a generic Action Group into a Common Alert Schema processor Logic App, then through a channel router to channel-specific Slack channel interface Logic Apps.
 
 ## Quick Start 🚀
 
@@ -20,9 +20,9 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 | Health check metric alerts (Web Apps / Function Apps) | `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json` | Add or update target entries; `main.bicep` loops these files into metric alert module deployments. |
 | Key Vault secret/certificate lifecycle alerts | `data/platform/keyvault-event-subscriptions.json` | Add event subscription definitions (event type, severity, name suffix) routed through MonitorAlert destination to the generic action group. |
 | ACR vulnerability log query alerts | `data/platform/acr-vulnerability-query-rules.json` | Add scheduled query rule objects (name suffix, severity, KQL query). |
-| App Insights query alerts | `data/team1/appinsights-query-rules.json` | Add query definitions with `team` and `runbookUrl` custom properties. |
+| App Insights query alerts | `data/team1/appinsights-query-rules.json` | Add query definitions with `channel` and `runbookUrl` custom properties. |
 | Notification processing and routing | `modules/logicApp/slack-commonAlertSchema.bicep`, `modules/logicApp/slack-router.bicep`, `modules/logicApp/slack-channelInterface.bicep`, `modules/actionGroup/generic.bicep` | Edit when changing alert payload formatting, routing, or Slack channel delivery behavior. |
-| Deployment parameters (environment-specific names and channel mappings) | `params/dev1.bicepparam`, `params/tst1.bicepparam` | Update Key Vault and Log Analytics names/resource groups and `channelInterfaces` secret-name mappings per environment. |
+| Deployment parameters (environment-specific names and channel mappings) | `params/dev1.bicepparam`, `params/tst1.bicepparam` | Update Key Vault and Log Analytics names/resource groups and `channelInterfaces` channel-name list per environment. |
 
 ## Entry Point 📍
 
@@ -37,7 +37,7 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 1. References an existing Log Analytics workspace.
 2. Deploys the Common Alert Schema processor Logic App (`slack-commonAlertSchema`).
 3. Deploys Slack channel interface Logic Apps for each entry in `channelInterfaces`.
-4. Deploys the team router Logic App and wires interface callback URLs.
+4. Deploys the channel router Logic App and wires interface callback URLs.
 5. Deploys a generic Action Group wired to the processor Logic App callback URL.
 6. Deploys a Key Vault Event Grid System Topic.
 7. Deploys Event Grid subscriptions from JSON config and routes them to Azure Monitor alerts with the generic Action Group.
@@ -50,15 +50,15 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 
 - Common Alert Schema processor Logic App
   - File: `modules/logicApp/slack-commonAlertSchema.bicep`
-  - Purpose: receives Common Alert Schema payloads, builds a router payload of shape `{ team, payload }`, and forwards to router.
+  - Purpose: receives Common Alert Schema payloads, builds a router payload of shape `{ channelName, payload }`, and forwards to router.
 
-- Team router Logic App
+- Channel router Logic App
   - File: `modules/logicApp/slack-router.bicep`
-  - Purpose: routes payloads to channel interface Logic Apps based on team (defaults to platform).
+  - Purpose: routes payloads to channel interface Logic Apps based on `channelName` (defaults to `epr-alerts-platform-non-prod`).
 
 - Channel interface Logic Apps
   - File: `modules/logicApp/slack-channelInterface.bicep`
-  - Purpose: pass-through posting of already-formatted Slack payload to team-specific webhook URL.
+  - Purpose: pass-through posting of already-formatted Slack payload to channel-specific webhook URL.
 
 - Generic Action Group
   - File: `modules/actionGroup/generic.bicep`
@@ -104,20 +104,19 @@ The deployment uses JSON data files for repeatable alert definitions:
   - Defines KQL query rules, severities, and naming for ACR vulnerability alerts.
 
 - `data/team1/appinsights-query-rules.json`
-  - Defines App Insights query rules, severities, naming, and custom team metadata.
+  - Defines App Insights query rules, severities, naming, and custom channel metadata.
 
 Custom property routing note 🧠:
 
-- Query/metric alert definitions can include `team` in `customProperties`.
-- Processor/router logic uses this team value for route selection.
-- If `team` is missing or empty, route defaults to `platform`.
+- Query/metric alert definitions include `channel` in `customProperties`.
+- Processor/router logic uses this channel value for route selection.
+- If `channel` is missing or empty, route defaults to `epr-alerts-platform-non-prod`.
 
 Parameter-driven channel mapping 🗺️:
 
 - `channelInterfaces` is an array parameter in `main.bicep`.
-- Each entry has `team` and `secretName` properties.
-- `team` is the route name (for example `Platform`, `Team1`, `SubmitData`, `ManageAccount`).
-- `secretName` is the Key Vault secret containing the Slack webhook URL.
+- Each entry is a Slack channel name string (for example `epr-alerts-platform-non-prod`).
+- The corresponding Key Vault secret is derived as `slack-webhook-${channelName}`.
 - Configure per environment in bicepparam files.
 
 ## Health Check Configuration By Environment 🏷️
@@ -127,7 +126,7 @@ Healthcheck targets are environment-keyed in JSON and selected in `main.bicep` u
 Current data shape:
 
 - `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json` contain objects keyed by environment (`DEV1`, `TST1`, `PRE1`, `PRE2`, `PRD1`).
-- Each environment key contains an array of target objects (`targetName`, `targetResourceGroup`, `description`, `team`).
+- Each environment key contains an array of target objects (`targetName`, `targetResourceGroup`, `description`, `channel`).
 
 Important ⚠️:
 

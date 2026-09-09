@@ -6,32 +6,11 @@ param environmentType = 'DEV'
 param keyVaultName = 'DEVRWDINFKV1401'
 param logAnalyticsWorkspaceName = 'DEVRWDINFLA1401'
 param channelInterfaces = [
-	{
-		team: 'ManageAccount'
-		secretName: 'slack-webhook-epr-alerts-manage-account-non-prod'
-	}
-	{
-		team: 'ManageLiabilities'
-		secretName: 'slack-webhook-epr-alerts-manage-liabilities-non-prod'
-	}
-	{
-		team: 'MeetObligations'
-		secretName: 'slack-webhook-epr-alerts-meet-obligations-non-prod'
-	}
-	{
-		team: 'Platform'
-		secretName: 'slack-webhook-epr-alerts-platform-non-prod'
-	}
-	{
-		team: 'RegulatorTooling'
-		secretName: 'slack-webhook-epr-alerts-regulator-tooling-non-prod'
-	}
-	{
-		team: 'SubmitData'
-		secretName: 'slack-webhook-epr-alerts-submit-data-non-prod'
-	}
-	{
-		team: 'Team1'
-		secretName: 'slack-webhook-epr-alerts-team1-non-prod'
-	}
+  'epr-alerts-manage-account-non-prod'
+  'epr-alerts-manage-liabilities-non-prod'
+  'epr-alerts-meet-obligations-non-prod'
+  'epr-alerts-platform-non-prod'
+  'epr-alerts-regulator-tooling-non-prod'
+  'epr-alerts-submit-data-non-prod'
+  'epr-alerts-team1-non-prod'
 ]

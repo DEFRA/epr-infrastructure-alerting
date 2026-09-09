@@ -2,7 +2,7 @@ param workflowName string
 param location string
 @secure()
 param defaultCallbackUrl string
-param teamRoutes array
+param slackChannels array
 param customTags object = {}
 
 resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
@@ -18,7 +18,7 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
         defaultCallbackUrl: {
           type: 'SecureString'
         }
-        teamRoutes: {
+        slackChannels: {
           type: 'Array'
         }
       }
@@ -30,7 +30,7 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
             schema: {
               type: 'object'
               properties: {
-                team: {
+                channelName: {
                   type: 'string'
                 }
                 payload: {
@@ -42,9 +42,9 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
         }
       }
       actions: {
-        Resolve_Team: {
+        Resolve_Channel: {
           type: 'Compose'
-          inputs: '@{toLower(trim(string(coalesce(triggerBody()?[\'team\'], \'\'))))}'
+          inputs: '@{toLower(trim(string(coalesce(triggerBody()?[\'channelName\'], \'\'))))}'
           runAfter: {}
         }
         Initialize_CallbackUrl: {
@@ -59,18 +59,18 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
             ]
           }
           runAfter: {
-            Resolve_Team: [
+            Resolve_Channel: [
               'Succeeded'
             ]
           }
         }
         Resolve_CallbackUrl: {
           type: 'Foreach'
-          foreach: '@parameters(\'teamRoutes\')'
+          foreach: '@parameters(\'slackChannels\')'
           actions: {
             Set_CallbackUrl_If_Match: {
               type: 'If'
-              expression: '@equals(toLower(string(coalesce(item()?[\'team\'], \'\'))), outputs(\'Resolve_Team\'))'
+              expression: '@equals(toLower(string(coalesce(item()?[\'channelName\'], \'\'))), outputs(\'Resolve_Channel\'))'
               actions: {
                 Set_CallbackUrl: {
                   type: 'SetVariable'
@@ -116,8 +116,8 @@ resource workflow 'Microsoft.Logic/workflows@2019-05-01' = {
       defaultCallbackUrl: {
         value: defaultCallbackUrl
       }
-      teamRoutes: {
-        value: teamRoutes
+      slackChannels: {
+        value: slackChannels
       }
     }
   }

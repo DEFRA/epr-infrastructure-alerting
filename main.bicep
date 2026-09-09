@@ -43,28 +43,25 @@ module commonAlertSchemaProcessor './modules/logicApp/slack-commonAlertSchema.bi
   }
 }
 
-module slackChannelInterfaces './modules/logicApp/slack-channelInterface.bicep' = [for (channelInterface, i) in channelInterfaces: {
-  name: 'slackChannelInterface-${channelInterface.team}-${environmentType}${environmentNumber}'
+module slackChannelInterfaces './modules/logicApp/slack-channelInterface.bicep' = [for channelInterface in channelInterfaces: {
+  name: 'slackChannelInterface-${uniqueString(channelInterface)}-${environmentType}${environmentNumber}'
   params: {
-    workflowName: 'SlackChannel-Interface-${channelInterface.team}-${environmentType}${environmentNumber}'
+    workflowName: 'SlackChannel-Interface-${channelInterface}-${environmentType}${environmentNumber}'
     location: location
-    slackWebhookUrl: platformSecretsKeyVault.getSecret(channelInterface.secretName)
+    slackWebhookUrl: platformSecretsKeyVault.getSecret('slack-webhook-${channelInterface}')
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
     })
   }
 }]
 
-var teamNames = [for channelInterface in channelInterfaces: channelInterface.team]
-var platformRouteIndex = indexOf(teamNames, 'Platform')
-
 module slackChannelRouter './modules/logicApp/slack-router.bicep' = {
   params: {
     workflowName: 'SlackChannel-Router-${environmentType}${environmentNumber}'
     location: location
-    defaultCallbackUrl: slackChannelInterfaces[platformRouteIndex].outputs.manualTriggerCallbackUrl
-    teamRoutes: [for (channelInterface, i) in channelInterfaces: {
-      team: channelInterface.team
+    defaultCallbackUrl: slackChannelInterfaces[indexOf(channelInterfaces, 'epr-alerts-platform-non-prod')].outputs.manualTriggerCallbackUrl
+    slackChannels: [for (channelInterface, i) in channelInterfaces: {
+      channelName: channelInterface
       callbackUrl: slackChannelInterfaces[i].outputs.manualTriggerCallbackUrl
     }]
     customTags: union(commonTags, {
@@ -113,21 +110,21 @@ module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for even
 }]
 
 module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/platform/acr-vulnerability-query-rules.json'): {
-  name: 'acrVulnerability-${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
+  name: 'acrVuln-${uniqueString('${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}')}'
   params: {
     actionGroupId: genericActionGroup.outputs.actionGroupId
-    alertName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
+    alertName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
     customProperties: {
       AlertCategory: 'Security'
       SignalSource: 'DefenderForCloud'
       runbookUrl: rule.runbookUrl
-      team: rule.team
+      channel: rule.channel
     }
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
       AlertType: 'AcrVulnerability'
     })
-    displayName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
+    displayName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
     description: rule.description
     evaluationFrequency: 'P1D'
     query: rule.query
@@ -141,9 +138,9 @@ module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule i
 }]
 
 module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in healthcheckTargets: {
-  name: 'healthCheckAlert-${target.targetName}-${target.team}'
+  name: 'healthCheckAlert-${target.targetName}-${target.channel}'
   params: {
-    alertName: 'HealthCheckAlert-${target.targetName}-${target.team}'
+    alertName: 'HealthCheckAlert-${target.targetName}-${target.channel}'
     actionGroupIds: [
       genericActionGroup.outputs.actionGroupId
     ]
@@ -155,26 +152,26 @@ module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for
     metricName: 'HealthCheckStatus'
     targetResourceName: target.targetName
     targetResourceGroup: target.targetResourceGroup
-    team: target.team
+    channel: target.channel
   }
 }]
 
 module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [for rule in appInsightsQueryRules: {
-  name: 'appInsightsQuery-${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
+  name: 'appInsights-${uniqueString('${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}')}'
   params: {
     actionGroupId: genericActionGroup.outputs.actionGroupId
-    alertName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
+    alertName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
     customProperties: {
       AlertCategory: 'Application'
       SignalSource: 'AppInsights'
       runbookUrl: rule.runbookUrl
-      team: rule.team
+      channel: rule.channel
     }
     customTags: union(commonTags, {
       Environment: '${environmentType}${environmentNumber}'
       AlertType: 'AppInsightsQuery'
     })
-    displayName: '${rule.nameSuffix}-${rule.team}-${environmentType}${environmentNumber}'
+    displayName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
     description: rule.description
     evaluationFrequency: rule.evaluationFrequency
     query: rule.query
