@@ -15,8 +15,8 @@ pr:
 variables:
   poolNONPROD: DEFRA-COMMON-UBUNTU-SSV3
   poolPROD: DEFRA-COMMON-UBUNTU-SSV5
-  serviceNameARMDEV1: AZD-RWD-DEV1
-  serviceNameARMTST1: AZD-RWD-TST1
+  serviceNameARMDEV1: AZD-RWD-DEV1-Alerts
+  serviceNameARMTST1: AZD-RWD-TST1-Alerts
   serviceNameARMPRE1: AZR-RWD-PRE1
   serviceNameARMPRE2: AZR-RWD-PRE2
   serviceNameARMPRD1: AZR-RWD-PRD1
