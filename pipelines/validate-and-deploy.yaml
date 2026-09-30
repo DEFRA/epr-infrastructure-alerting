@@ -110,22 +110,22 @@ stages:
           deploymentName: TST1
           resourceGroupName: TSTRWDINFRG1401
 
-  # - stage: Deploy_PRE1
-  #   displayName: Deploy to PRE1
-  #   dependsOn:
-  #     - Deploy_DEV1
-  #     - Deploy_TST1
-  #   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-  #   pool: $(poolPROD)
-  #   jobs:
-  #     - template: templates/deploy-resources.yaml
-  #       parameters:
-  #         jobName: Deploy_PRE1
-  #         adoEnvironment: PRE1
-  #         bicepParameters: pre1.bicepparam
-  #         connectedServiceNameARM: $(serviceNameARMPRE1)
-  #         deploymentName: PRE1
-  #         resourceGroupName: PRERWDINFRG1401
+  - stage: Deploy_PRE1
+    displayName: Deploy to PRE1
+    dependsOn:
+      - Deploy_DEV1
+      - Deploy_TST1
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    pool: $(poolPROD)
+    jobs:
+      - template: templates/deploy-resources.yaml
+        parameters:
+          jobName: Deploy_PRE1
+          adoEnvironment: PRE1
+          bicepParameters: pre1.bicepparam
+          connectedServiceNameARM: $(serviceNameARMPRE1)
+          deploymentName: PRE1
+          resourceGroupName: PRERWDINFRG1401
 
   # - stage: Deploy_PRD1
   #   displayName: Deploy to PRD1
