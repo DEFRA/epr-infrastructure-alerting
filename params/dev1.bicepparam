@@ -1,10 +1,6 @@
 using '../main.bicep'
 
 param appInsightsName = 'DEVRWDINFAI1401'
-param environmentNumber = '1'
-param environmentType = 'DEV'
-param keyVaultName = 'DEVRWDINFKV1401'
-param logAnalyticsWorkspaceName = 'DEVRWDINFLA1401'
 param channelInterfaces = [
   'epr-alerts-manage-account-non-prod'
   'epr-alerts-manage-liabilities-non-prod'
@@ -14,3 +10,8 @@ param channelInterfaces = [
   'epr-alerts-submit-data-non-prod'
   'epr-alerts-team1-non-prod'
 ]
+param channelInterfaceDefault = 'epr-alerts-platform-non-prod'
+param environmentNumber = '1'
+param environmentType = 'DEV'
+param keyVaultName = 'DEVRWDINFKV1401'
+param logAnalyticsWorkspaceName = 'DEVRWDINFLA1401'
