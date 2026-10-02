@@ -18,7 +18,6 @@ variables:
   serviceNameARMDEV1: AZD-RWD-DEV1-Alerts
   serviceNameARMTST1: AZD-RWD-TST1-Alerts
   serviceNameARMPRE1: AZR-RWD-PRE1-Alerts
-  serviceNameARMPRE2: AZR-RWD-PRE2
   serviceNameARMPRD1: AZR-RWD-PRD1-Alerts
 
 stages:
@@ -116,17 +115,17 @@ stages:
           deploymentName: PRE1
           resourceGroupName: PRERWDINFRG1401
 
-  # - stage: Deploy_PRD1
-  #   displayName: Deploy to PRD1
-  #   dependsOn: Deploy_PRE1
-  #   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-  #   pool: $(poolPROD)
-  #   jobs:
-  #     - template: templates/deploy-resources.yaml
-  #       parameters:
-  #         jobName: Deploy_PRD1
-  #         adoEnvironment: PRD1
-  #         bicepParameters: prd1.bicepparam
-  #         connectedServiceNameARM: $(serviceNameARMPRD1)
-  #         deploymentName: PRD1
-  #         resourceGroupName: PRDRWDINFRG1401
+  - stage: Deploy_PRD1
+    displayName: Deploy to PRD1
+    dependsOn: Deploy_PRE1
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    pool: $(poolPROD)
+    jobs:
+      - template: templates/deploy-resources.yaml
+        parameters:
+          jobName: Deploy_PRD1
+          adoEnvironment: PRD1
+          bicepParameters: prd1.bicepparam
+          connectedServiceNameARM: $(serviceNameARMPRD1)
+          deploymentName: PRD1
+          resourceGroupName: PRDRWDINFRG1401
