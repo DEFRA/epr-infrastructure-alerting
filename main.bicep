@@ -1,12 +1,13 @@
 import { commonTags } from './common.bicep'
 
 param appInsightsName string
+param channelInterfaces array
+param channelInterfaceDefault string
 param environmentNumber string
 param environmentType string
 param keyVaultName string
 param location string = resourceGroup().location
 param logAnalyticsWorkspaceName string
-param channelInterfaces array
 
 var appInsightsQueryRules = concat(
   loadJsonContent('./data/team1/appinsights-query-rules.json')
@@ -59,7 +60,7 @@ module slackChannelRouter './modules/logicApp/slack-router.bicep' = {
   params: {
     workflowName: 'SlackChannel-Router-${environmentType}${environmentNumber}'
     location: location
-    defaultCallbackUrl: slackChannelInterfaces[indexOf(channelInterfaces, 'epr-alerts-platform-non-prod')].outputs.manualTriggerCallbackUrl
+    defaultCallbackUrl: slackChannelInterfaces[indexOf(channelInterfaces, channelInterfaceDefault)].outputs.manualTriggerCallbackUrl
     slackChannels: [for (channelInterface, i) in channelInterfaces: {
       channelName: channelInterface
       callbackUrl: slackChannelInterfaces[i].outputs.manualTriggerCallbackUrl

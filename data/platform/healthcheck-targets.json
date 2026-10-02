@@ -17,5 +17,12 @@
     ],
     "PRE1": [],
     "PRE2": [],
-    "PRD1": []
+    "PRD1": [
+        {
+            "targetName": "PRDRWDWEBWA1401",
+            "targetResourceGroup": "PRDRWDWEBRG1401",
+            "description": "Health check for PRDRWDWEBWA1401 dropped below 100% in the last 5 minutes",
+            "channel": "epr-alerts-platform-prod"
+        }
+    ]
 }

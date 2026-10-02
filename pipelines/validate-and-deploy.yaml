@@ -18,8 +18,7 @@ variables:
   serviceNameARMDEV1: AZD-RWD-DEV1-Alerts
   serviceNameARMTST1: AZD-RWD-TST1-Alerts
   serviceNameARMPRE1: AZR-RWD-PRE1-Alerts
-  serviceNameARMPRE2: AZR-RWD-PRE2
-  serviceNameARMPRD1: AZR-RWD-PRD1
+  serviceNameARMPRD1: AZR-RWD-PRD1-Alerts
 
 stages:
   - stage: Validate_Stage
@@ -58,27 +57,16 @@ stages:
               connectedServiceNameARM: $(serviceNameARMPRE1)
               resourceGroupName: PRERWDINFRG1401
 
-      # - job: Validate_PRE2
-      #   displayName: PRE2 Valid
-      #   pool: $(poolPROD)
-      #   steps:
-      #     - template: templates/validate-and-whatif.yaml
-      #       parameters:
-      #         adoEnvironment: PRE2
-      #         bicepParameters: pre2.bicepparam
-      #         connectedServiceNameARM: $(serviceNameARMPRE2)
-      #         resourceGroupName: PRERWDINFRG2401
-
-      # - job: Validate_PRD1
-      #   displayName: PRD1 Valid
-      #   pool: $(poolPROD)
-      #   steps:
-      #     - template: templates/validate-and-whatif.yaml
-      #       parameters:
-      #         adoEnvironment: PRD1
-      #         bicepParameters: prd1.bicepparam
-      #         connectedServiceNameARM: $(serviceNameARMPRD1)
-      #         resourceGroupName: PRDRWDINFRG1401
+      - job: Validate_PRD1
+        displayName: PRD1 Valid
+        pool: $(poolPROD)
+        steps:
+          - template: templates/validate-and-whatif.yaml
+            parameters:
+              adoEnvironment: PRD1
+              bicepParameters: prd1.bicepparam
+              connectedServiceNameARM: $(serviceNameARMPRD1)
+              resourceGroupName: PRDRWDINFRG1401
 
   - stage: Deploy_DEV1
     displayName: Deploy to DEV1
@@ -127,32 +115,17 @@ stages:
           deploymentName: PRE1
           resourceGroupName: PRERWDINFRG1401
 
-  # - stage: Deploy_PRD1
-  #   displayName: Deploy to PRD1
-  #   dependsOn: Deploy_PRE1
-  #   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-  #   pool: $(poolPROD)
-  #   jobs:
-  #     - template: templates/deploy-resources.yaml
-  #       parameters:
-  #         jobName: Deploy_PRD1
-  #         adoEnvironment: PRD1
-  #         bicepParameters: prd1.bicepparam
-  #         connectedServiceNameARM: $(serviceNameARMPRD1)
-  #         deploymentName: PRD1
-  #         resourceGroupName: PRDRWDINFRG1401
-
-  # - stage: Deploy_PRE2
-  #   displayName: Deploy to PRE2
-  #   dependsOn: Deploy_PRD1
-  #   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-  #   pool: $(poolPROD)
-  #   jobs:
-  #     - template: templates/deploy-resources.yaml
-  #       parameters:
-  #         jobName: Deploy_PRE2
-  #         adoEnvironment: PRE2
-  #         bicepParameters: pre2.bicepparam
-  #         connectedServiceNameARM: $(serviceNameARMPRE2)
-  #         deploymentName: PRE2
-  #         resourceGroupName: PRERWDINFRG2401
+  - stage: Deploy_PRD1
+    displayName: Deploy to PRD1
+    dependsOn: Deploy_PRE1
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    pool: $(poolPROD)
+    jobs:
+      - template: templates/deploy-resources.yaml
+        parameters:
+          jobName: Deploy_PRD1
+          adoEnvironment: PRD1
+          bicepParameters: prd1.bicepparam
+          connectedServiceNameARM: $(serviceNameARMPRD1)
+          deploymentName: PRD1
+          resourceGroupName: PRDRWDINFRG1401
