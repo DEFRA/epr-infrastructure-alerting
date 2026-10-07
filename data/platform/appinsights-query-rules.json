@@ -1,0 +1,50 @@
+{
+  "DEV1": [
+    {
+      "nameSuffix": "AppInsights-AntiVirus-FileUploaded",
+      "description": "A file was uploaded to blob storage for antivirus scanning (DEV1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT5M",
+      "windowSize": "PT5M",
+      "query": "traces | where message contains 'File Uploaded to blob storage'",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal",
+      "channel": "epr-alerts-platform-non-prod"
+    }
+  ],
+  "TST1": [
+    {
+      "nameSuffix": "AppInsights-AntiVirus-FileUploaded",
+      "description": "A file was uploaded to blob storage for antivirus scanning (TST1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT5M",
+      "windowSize": "PT5M",
+      "query": "traces | where message contains 'File Uploaded to blob storage'",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal",
+      "channel": "epr-alerts-platform-non-prod"
+    }
+  ],
+  "PRE1": [
+    {
+      "nameSuffix": "AppInsights-AntiVirus-FileUploaded",
+      "description": "A file was uploaded to blob storage for antivirus scanning (PRE1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT5M",
+      "windowSize": "PT5M",
+      "query": "traces | where message contains 'File Uploaded to blob storage'",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal",
+      "channel": "epr-alerts-platform-prod"
+    }
+  ],
+  "PRD1": [
+    {
+      "nameSuffix": "AppInsights-AntiVirus-FileUploaded",
+      "description": "A file was uploaded to blob storage for antivirus scanning (PRD1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT5M",
+      "windowSize": "PT5M",
+      "query": "traces | where message contains 'File Uploaded to blob storage'",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal",
+      "channel": "epr-alerts-platform-prod"
+    }
+  ]
+}

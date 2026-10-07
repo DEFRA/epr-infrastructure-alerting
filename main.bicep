@@ -9,16 +9,24 @@ param keyVaultName string
 param location string = resourceGroup().location
 param logAnalyticsWorkspaceName string
 
+var environmentKey = '${environmentType}${environmentNumber}'
+
 var appInsightsQueryRules = concat(
-  loadJsonContent('./data/team1/appinsights-query-rules.json')
+  loadJsonContent('./data/platform/appinsights-query-rules.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/manage-account/appinsights-query-rules.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/manage-liabilities/appinsights-query-rules.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/meet-obligations/appinsights-query-rules.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/regulator-tooling/appinsights-query-rules.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/submit-data/appinsights-query-rules.json')[?environmentKey] ?? []
 )
 
-var environmentKey = '${environmentType}${environmentNumber}'
-var platformHealthcheckTargetsByEnvironment = loadJsonContent('./data/platform/healthcheck-targets.json')
-var team1HealthcheckTargetsByEnvironment = loadJsonContent('./data/team1/healthcheck-targets.json')
 var healthcheckTargets = concat(
-  platformHealthcheckTargetsByEnvironment[?environmentKey] ?? [],
-  team1HealthcheckTargetsByEnvironment[?environmentKey] ?? []
+  loadJsonContent('./data/platform/healthcheck-targets.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/manage-account/healthcheck-targets.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/manage-liabilities/healthcheck-targets.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/meet-obligations/healthcheck-targets.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/regulator-tooling/healthcheck-targets.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/submit-data/healthcheck-targets.json')[?environmentKey] ?? []
 )
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
@@ -110,6 +118,25 @@ module eventSubscriptionsModules './modules/eventSubscription.bicep' = [for even
   }
 }]
 
+module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in healthcheckTargets: {
+  name: 'healthCheckAlert-${target.targetName}-${target.channel}'
+  params: {
+    alertName: 'HealthCheckAlert-${target.targetName}-${target.channel}'
+    actionGroupIds: [
+      genericActionGroup.outputs.actionGroupId
+    ]
+    customTags: union(commonTags, {
+      AlertType: 'HealthCheck'
+      Environment: '${environmentType}${environmentNumber}'
+    })
+    description: target.description
+    metricName: 'HealthCheckStatus'
+    targetResourceName: target.targetName
+    targetResourceGroup: target.targetResourceGroup
+    channel: target.channel
+  }
+}]
+
 module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule in loadJsonContent('./data/platform/acr-vulnerability-query-rules.json'): {
   name: 'acrVuln-${uniqueString('${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}')}'
   params: {
@@ -127,33 +154,14 @@ module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [for rule i
     })
     displayName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
     description: rule.description
-    evaluationFrequency: 'P1D'
+    evaluationFrequency: rule.evaluationFrequency
     query: rule.query
     scopeResourceId: logAnalyticsWorkspace.id
     severity: rule.severity
     targetResourceTypes: [
       'Microsoft.ContainerRegistry/registries'
     ]
-    windowSize: 'P1D'
-  }
-}]
-
-module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [for target in healthcheckTargets: {
-  name: 'healthCheckAlert-${target.targetName}-${target.channel}'
-  params: {
-    alertName: 'HealthCheckAlert-${target.targetName}-${target.channel}'
-    actionGroupIds: [
-      genericActionGroup.outputs.actionGroupId
-    ]
-    customTags: union(commonTags, {
-      AlertType: 'HealthCheck'
-      Environment: '${environmentType}${environmentNumber}'
-    })
-    description: target.description
-    metricName: 'HealthCheckStatus'
-    targetResourceName: target.targetName
-    targetResourceGroup: target.targetResourceGroup
-    channel: target.channel
+    windowSize: rule.windowSize
   }
 }]
 
