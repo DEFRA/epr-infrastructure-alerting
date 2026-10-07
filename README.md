@@ -169,6 +169,41 @@ Key wiring in `main.bicep`:
 - For Event Grid MonitorAlert destination:
   - Set `destination.properties.actionGroups` to include `genericActionGroup.outputs.actionGroupId`.
 
+## Walkthrough: Add A Healthcheck Alert 👥
+
+Ensure you have a `healthcheck-targets.json` file in the folder for your team:
+
+- `data/<team-folder>/healthcheck-targets.json`
+
+Steps:
+
+1. Pick the correct environment array (`DEV1`, `TST1`, `PRE1`, `PRD1`).
+2. Add a new object with `targetName`, `targetResourceGroup`, `description`, and `channel`.
+3. Run validate/what-if from this README before raising a PR.
+
+Example:
+
+```json
+{
+  "DEV1": [
+    {
+      "targetName": "DEVRWDWEBWA1401",
+      "targetResourceGroup": "DEVRWDWEBRG1401",
+      "description": "Health check for DEVRWDWEBWA1401 dropped below 100% in the last 5 minutes",
+      "channel": "epr-alerts-platform-non-prod"
+    }
+  ],
+  "TST1": [],
+  "PRE1": [],
+  "PRD1": []
+}
+```
+
+Notes:
+
+- `main.bicep` already merges platform + non-platform team healthcheck files.
+- Use `epr-alerts-platform-non-prod` for non-prod environments and `epr-alerts-platform-prod` for production.
+
 ## Local Validation And Deployment ✅
 
 From the repository root:

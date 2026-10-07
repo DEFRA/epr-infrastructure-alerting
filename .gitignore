@@ -1,5 +1,5 @@
 /*.json
-modules/*.json
+/modules/**/*.json
 params/*.json
 **/node_modules/
 /docs/dist/**

@@ -123,6 +123,22 @@ model {
       }
     }
 
+    appInsightsAlertPathCurrent = system "APPLICATION INSIGHTS ALERT PATH" {
+      description "Current App Insights scheduled query alert path"
+
+      appInsightsComponentCurrent = container "Application Insights Component" {
+        icon azure:monitor
+        technology "Microsoft.Insights/components"
+        description "Stores telemetry queried by App Insights scheduled query alerts"
+      }
+
+      appInsightsScheduledAlertCurrent = container "App Insights Scheduled Query Alert" {
+        icon azure:monitor
+        technology "Microsoft.Insights/scheduledQueryRules"
+        description "Current scheduled query alert for App Insights traces and telemetry"
+      }
+    }
+
     eventGrid = system "Azure Event Grid" {
       icon azure:event-grid-topics
       description "Routes Key Vault events to Azure Monitor"
@@ -263,10 +279,10 @@ model {
         description "Pass-through channel interface that posts incoming payload directly to the platform Slack webhook"
       }
 
-      team1ChannelInterfaceLogicApp = container "SlackChannel-Interface-team1" {
+      teamNonPlatformChannelInterfaceLogicApp = container "SlackChannel-Interface-<team-channel>" {
         icon azure:logic-apps
         technology "Microsoft.Logic/workflows"
-        description "Pass-through channel interface that posts incoming payload directly to the Team1 Slack webhook"
+        description "Pass-through channel interface representing any non-platform team channel webhook"
       }
 
       genericEmailReceiver = component "Email Receiver" {
@@ -324,13 +340,14 @@ model {
   pipeline -> keyVaultExpirySubscriptionCurrent "Deploys"
   pipeline -> functionAppHealthMetricAlertCurrent "Deploys"
   pipeline -> webAppHealthMetricAlertCurrent "Deploys"
+  pipeline -> appInsightsScheduledAlertCurrent "Deploys"
   pipeline -> acrVulnerabilityScheduledAlertCurrent "Deploys"
   pipeline -> alertingPlatform.genericActionGroup "Deploys"
   pipeline -> alertingPlatform.genericSlackLogicApp "Deploys"
   pipeline -> alertingPlatform.genericSlackLogicAppV2 "Deploys"
   pipeline -> alertingPlatform.teamRouterLogicApp "Deploys"
   pipeline -> alertingPlatform.teamPlatformChannelInterfaceLogicApp "Deploys"
-  pipeline -> alertingPlatform.team1ChannelInterfaceLogicApp "Deploys"
+  pipeline -> alertingPlatform.teamNonPlatformChannelInterfaceLogicApp "Deploys"
 
   acrContainerRegistryCurrent -> acrDefenderForCloudCurrent "Images scanned by"
   acrDefenderForCloudCurrent -> acrLogAnalyticsWorkspaceCurrent "Exports findings via Continuous Export"
@@ -344,6 +361,8 @@ model {
   webAppHealthCurrent -> webAppHealthMetricAlertCurrent "Publishes health metrics"
   functionAppHealthMetricAlertCurrent -> azureMonitorEvaluation.azureMonitor "Evaluated by"
   webAppHealthMetricAlertCurrent -> azureMonitorEvaluation.azureMonitor "Evaluated by"
+  appInsightsComponentCurrent -> appInsightsScheduledAlertCurrent "Queried by"
+  appInsightsScheduledAlertCurrent -> alertingPlatform.genericActionGroup "Fires alert to"
   alertingPlatform.genericActionGroup -> alertingPlatform.genericSlackLogicAppV2 "Invokes"
   alertingPlatform.genericActionGroup -> alertingPlatform.genericEmailReceiver
   alertingPlatform.genericActionGroup -> alertingPlatform.genericWebhookReceiver
@@ -351,55 +370,125 @@ model {
   alertingPlatform.genericSlackLogicAppV2 -> alertingPlatform.teamRouterLogicApp "Forwards router payload"
   eprTeams -> alertingPlatform.teamRouterLogicApp "Sends team and payload request"
   alertingPlatform.teamRouterLogicApp -> alertingPlatform.teamPlatformChannelInterfaceLogicApp "Routes payload when team = platform or not supplied"
-  alertingPlatform.teamRouterLogicApp -> alertingPlatform.team1ChannelInterfaceLogicApp "Routes payload when team=team1"
+  alertingPlatform.teamRouterLogicApp -> alertingPlatform.teamNonPlatformChannelInterfaceLogicApp "Routes payload by channelName for non-platform team channels"
   alertingPlatform.teamPlatformChannelInterfaceLogicApp -> slackWorkspace "Posts payload via platform webhook"
-  alertingPlatform.team1ChannelInterfaceLogicApp -> slackWorkspace "Posts payload via Team1 webhook"
+  alertingPlatform.teamNonPlatformChannelInterfaceLogicApp -> slackWorkspace "Posts payload via selected non-platform team webhook"
 }
 
 views {
   view index {
-    title "Alert Runtime Path v1"
-    description "Initial shared-platform design with a common alerting stack across services."
+    title "Alert Flow and Routing Architecture"
+    description "Current runtime alert paths for ACR vulnerability, Key Vault expiry, and health checks flowing through the shared action-group and Logic App routing stack."
     autoLayout TopBottom
     include azurePlatform
     include externalAlerting
-    include keyVault
-    include functionAppHealth
-    include eventGrid
-    include eventGrid.keyVaultSystemTopic
-    include eventGrid.keyVaultExpirySubscription
-    include azureMonitorEvaluation
-    include azureMonitorEvaluation.azureMonitor
-    include azureMonitorEvaluation.healthCheckMetricAlert
-    include sharedAlerting.actionGroups
-    include sharedAlerting.slackLogicApps
-    include sharedAlerting.emailReceiver
-    include sharedAlerting.webhookReceiver
-    include slackWorkspace
+    include azurePlatform.acrAlertPathCurrent
+    include azurePlatform.appInsightsAlertPathCurrent
+    include azurePlatform.alertingPlatform
+    include azurePlatform.keyVaultAlertPathCurrent
+    include azurePlatform.healthAlertPathCurrent
+    include azurePlatform.azureMonitorEvaluation.azureMonitor
+    include azurePlatform.alertingPlatform.genericActionGroup
+    include azurePlatform.alertingPlatform.genericSlackLogicAppV2
+    include azurePlatform.alertingPlatform.teamRouterLogicApp
+    include azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp
+    include azurePlatform.alertingPlatform.teamNonPlatformChannelInterfaceLogicApp
+    include externalAlerting.slackWorkspace
 
-    include keyVault -> keyVaultSystemTopic with {
+    // ACR vulnerability path (current: generic action group + logic app)
+    include azurePlatform.acrAlertPathCurrent.acrContainerRegistryCurrent -> azurePlatform.acrAlertPathCurrent.acrDefenderForCloudCurrent with {
+      color sky
+      line solid
+    }
+    include azurePlatform.acrAlertPathCurrent.acrDefenderForCloudCurrent -> azurePlatform.acrAlertPathCurrent.acrLogAnalyticsWorkspaceCurrent with {
+      color sky
+      line solid
+    }
+    include azurePlatform.acrAlertPathCurrent.acrLogAnalyticsWorkspaceCurrent -> azurePlatform.acrAlertPathCurrent.acrVulnerabilityScheduledAlertCurrent with {
+      color sky
+      line solid
+    }
+    include azurePlatform.acrAlertPathCurrent.acrVulnerabilityScheduledAlertCurrent -> azurePlatform.alertingPlatform.genericActionGroup with {
+      color sky
+      line solid
+    }
+    include azurePlatform.alertingPlatform.genericActionGroup -> azurePlatform.alertingPlatform.genericSlackLogicAppV2 with {
+      color sky
+      line solid
+    }
+    include azurePlatform.alertingPlatform.genericSlackLogicAppV2 -> azurePlatform.alertingPlatform.teamRouterLogicApp with {
+      color sky
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamRouterLogicApp -> azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp with {
+      color amber
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamRouterLogicApp -> azurePlatform.alertingPlatform.teamNonPlatformChannelInterfaceLogicApp with {
+      color green
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp -> externalAlerting.slackWorkspace with {
+      color amber
+      line solid
+    }
+    include azurePlatform.alertingPlatform.teamNonPlatformChannelInterfaceLogicApp -> externalAlerting.slackWorkspace with {
       color green
       line solid
     }
 
-    include keyVaultSystemTopic -> keyVaultExpirySubscription with {
+    // App Insights scheduled query alerts path (current)
+    include azurePlatform.appInsightsAlertPathCurrent.appInsightsComponentCurrent -> azurePlatform.appInsightsAlertPathCurrent.appInsightsScheduledAlertCurrent with {
+      color indigo
+      line solid
+    }
+    include azurePlatform.appInsightsAlertPathCurrent.appInsightsScheduledAlertCurrent -> azurePlatform.alertingPlatform.genericActionGroup with {
+      color indigo
+      line solid
+    }
+
+    // Key Vault path (current: generic action group + logic app)
+    include azurePlatform.keyVaultAlertPathCurrent.keyVaultCurrent -> azurePlatform.keyVaultAlertPathCurrent.keyVaultSystemTopicCurrent with {
+      color green
+      line solid
+    }
+    include azurePlatform.keyVaultAlertPathCurrent.keyVaultSystemTopicCurrent -> azurePlatform.keyVaultAlertPathCurrent.keyVaultExpirySubscriptionCurrent with {
+      color green
+      line solid
+    }
+    include azurePlatform.keyVaultAlertPathCurrent.keyVaultExpirySubscriptionCurrent -> azurePlatform.azureMonitorEvaluation.azureMonitor with {
+      color green
+      line solid
+    }
+    include azurePlatform.azureMonitorEvaluation.azureMonitor -> azurePlatform.alertingPlatform.genericActionGroup with {
       color green
       line solid
     }
 
-    include keyVaultExpirySubscription -> azureMonitorEvaluation.azureMonitor with {
-      color green
+    // Health check metric alerts path (current: function and web app)
+    include azurePlatform.healthAlertPathCurrent.functionAppHealthCurrent -> azurePlatform.healthAlertPathCurrent.functionAppHealthMetricAlertCurrent with {
+      color primary
       line solid
     }
-
-    include azureMonitorEvaluation.azureMonitor -> actionGroups with {
-      color green
-      line solid
-    }
-
-    include functionAppHealth -> azureMonitorEvaluation.healthCheckMetricAlert with {
+    include azurePlatform.healthAlertPathCurrent.webAppHealthCurrent -> azurePlatform.healthAlertPathCurrent.webAppHealthMetricAlertCurrent with {
       color red
       line solid
+    }
+    include azurePlatform.healthAlertPathCurrent.functionAppHealthMetricAlertCurrent -> azurePlatform.azureMonitorEvaluation.azureMonitor with {
+      color primary
+      line solid
+    }
+    include azurePlatform.healthAlertPathCurrent.webAppHealthMetricAlertCurrent -> azurePlatform.azureMonitorEvaluation.azureMonitor with {
+      color red
+      line solid
+    }
+
+    // Force App Insights path to render as a vertical chain.
+    rank min {
+      azurePlatform.appInsightsAlertPathCurrent.appInsightsComponentCurrent
+    }
+    rank max {
+      azurePlatform.appInsightsAlertPathCurrent.appInsightsScheduledAlertCurrent
     }
 
     style azurePlatform {
@@ -407,67 +496,95 @@ views {
       opacity 12%
       border solid
     }
-
     style externalAlerting {
       color amber
       opacity 16%
       border solid
     }
-
-    style azureMonitorEvaluation {
-      color primary
+    style azurePlatform.alertingPlatform {
+      color secondary
       opacity 12%
       border solid
     }
-
-    style azureMonitorEvaluation.azureMonitor {
+    style azurePlatform.acrAlertPathCurrent {
+      color amber
+      opacity 10%
+      border solid
+    }
+    style azurePlatform.keyVaultAlertPathCurrent {
+      color green
+      opacity 10%
+      border solid
+    }
+    style azurePlatform.healthAlertPathCurrent {
+      color primary
+      opacity 10%
+      border solid
+    }
+    style azurePlatform.appInsightsAlertPathCurrent {
+      color indigo
+      opacity 10%
+      border solid
+    }
+    style azurePlatform.azureMonitorEvaluation.azureMonitor {
       color primary
     }
-
-    style azureMonitorEvaluation.healthCheckMetricAlert {
-      color red
+    style azurePlatform.acrAlertPathCurrent.acrContainerRegistryCurrent {
+      color amber
     }
-
-    style keyVault {
+    style azurePlatform.acrAlertPathCurrent.acrDefenderForCloudCurrent {
+      color amber
+    }
+    style azurePlatform.acrAlertPathCurrent.acrLogAnalyticsWorkspaceCurrent {
+      color amber
+    }
+    style azurePlatform.acrAlertPathCurrent.acrVulnerabilityScheduledAlertCurrent {
+      color amber
+    }
+    style azurePlatform.keyVaultAlertPathCurrent.keyVaultCurrent {
       color green
     }
-
-    style functionAppHealth {
+    style azurePlatform.keyVaultAlertPathCurrent.keyVaultSystemTopicCurrent {
+      color green
+    }
+    style azurePlatform.keyVaultAlertPathCurrent.keyVaultExpirySubscriptionCurrent {
+      color green
+    }
+    style azurePlatform.healthAlertPathCurrent.functionAppHealthCurrent {
+      color primary
+    }
+    style azurePlatform.healthAlertPathCurrent.webAppHealthCurrent {
       color red
     }
-
-    style eventGrid {
-      color secondary
-      opacity 12%
-      border solid
+    style azurePlatform.healthAlertPathCurrent.functionAppHealthMetricAlertCurrent {
+      color primary
     }
-
-    style eventGrid.keyVaultSystemTopic {
+    style azurePlatform.healthAlertPathCurrent.webAppHealthMetricAlertCurrent {
+      color red
+    }
+    style azurePlatform.appInsightsAlertPathCurrent.appInsightsComponentCurrent {
       color indigo
     }
-
-    style eventGrid.keyVaultExpirySubscription {
-      color amber
+    style azurePlatform.appInsightsAlertPathCurrent.appInsightsScheduledAlertCurrent {
+      color indigo
     }
-
-    style sharedAlerting.actionGroups {
+    style azurePlatform.alertingPlatform.genericActionGroup {
       color secondary
     }
-
-    style sharedAlerting.slackLogicApps {
-      color muted
+    style azurePlatform.alertingPlatform.genericSlackLogicAppV2 {
+      color primary
     }
-
-    style sharedAlerting.emailReceiver {
-      color gray
+    style azurePlatform.alertingPlatform.teamRouterLogicApp {
+      color indigo
     }
-
-    style sharedAlerting.webhookReceiver {
-      color gray
-    }
-
-    style slackWorkspace {
+    style azurePlatform.alertingPlatform.teamPlatformChannelInterfaceLogicApp {
       color amber
+    }
+    style azurePlatform.alertingPlatform.teamNonPlatformChannelInterfaceLogicApp {
+      color green
+    }
+    style externalAlerting.slackWorkspace {
+      color gray
     }
   }
 }
