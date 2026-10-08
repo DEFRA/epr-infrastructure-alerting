@@ -1,5 +1,18 @@
 {
-  "DEV1": [],
+  "DEV1": [
+    {
+      "nameSuffix": "AppInsights-Synapse-PipelineRun-Failed",
+      "description": "A Synapse integration pipeline run failed in the last 30 minutes (DEV1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT30M",
+      "windowSize": "PT30M",
+      "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\" | summarize arg_max(TimeGenerated, *) by RunId | extend WorkspaceName = tostring(split(_ResourceId, \"/\")[8]) | project FailureTimestamp = coalesce(End, TimeGenerated), PipelineName, RunId, WorkspaceName, _ResourceId",
+      "scopeResourceType": "LogAnalytics",
+      "scopeResourceId": "/subscriptions/4dc3cd05-36fc-4662-a4ca-88d65a346894/resourceGroups/DEVEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/DEVEPDINFLAW1401",
+      "runbookUrl": "",
+      "channel": "epr-alerts-submit-data-non-prod"
+    }
+  ],
   "TST1": [],
   "PRE1": [],
   "PRD1": []

@@ -1,9 +1,9 @@
 @export()
-var commonTags = {
+var globalTags = {
   ManagedBy: 'Bicep'
   Owner: 'Platform Team'
   Purpose: 'SHARED-ALERTING'
-  Repo: 'ccoe-epr-infrastructure'
+  Repo: 'epr-infrastructure-alerting'
   ServiceCode: 'RWD'
   Tier: 'SHARED'
 }
