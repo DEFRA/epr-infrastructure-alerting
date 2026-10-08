@@ -1,6 +1,6 @@
 param actionGroupName string
-param customTags object = {}
 param groupShortName string
+param tags object = {}
 @secure()
 param workflowCallbackUrl string
 param workflowResourceId string
@@ -9,7 +9,7 @@ param workflowResourceId string
 resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   name: actionGroupName
   location: 'global'
-  tags: customTags
+  tags: tags
   properties: {
     enabled: true
     groupShortName: groupShortName
