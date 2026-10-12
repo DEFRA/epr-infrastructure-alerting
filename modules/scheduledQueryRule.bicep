@@ -5,17 +5,24 @@ param severity int
 param evaluationFrequency string
 param windowSize string
 param query string
+@allowed([
+  'loganalytics'
+  'appinsights'
+])
+param scopeResourceType string
 param scopeResourceId string
-param targetResourceTypes string[]
 param actionGroupId string
 param customProperties object = {}
-param customTags object = {}
+param tags object = {}
+
+var logAnalyticsScopeResourceType = 'Microsoft.OperationalInsights/workspaces'
+var appInsightsScopeResourceType = 'Microsoft.Insights/components'
 
 resource logQueryAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   name: alertName
   location: resourceGroup().location
   kind: 'LogAlert'
-  tags: customTags
+  tags: tags
   properties: {
     displayName: displayName
     description: description
@@ -26,7 +33,9 @@ resource logQueryAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
     scopes: [
       scopeResourceId
     ]
-    targetResourceTypes: targetResourceTypes
+    targetResourceTypes: toLower(scopeResourceType) == 'loganalytics'
+      ? [logAnalyticsScopeResourceType]
+      : [appInsightsScopeResourceType]
     criteria: {
       allOf: [
         {

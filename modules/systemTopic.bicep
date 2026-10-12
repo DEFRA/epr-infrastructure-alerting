@@ -1,9 +1,9 @@
-param systemTopicName string
 param keyVaultName string
 param keyVaultResourceGroup string
 param keyVaultSubscriptionId string = subscription().subscriptionId
 param location string = resourceGroup().location
-param customTags object = {}
+param systemTopicName string
+param tags object = {}
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
@@ -13,7 +13,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 resource systemTopic 'Microsoft.EventGrid/systemTopics@2022-06-15' = {
   name: systemTopicName
   location: location
-  tags: customTags
+  tags: tags
   properties: {
     source: keyVault.id
     topicType: 'Microsoft.KeyVault.vaults'

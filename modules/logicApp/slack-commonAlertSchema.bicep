@@ -1,13 +1,13 @@
-param workflowName string
 param location string
 @secure()
 param routerCallbackUrl string
-param customTags object = {}
+param tags object = {}
+param workflowName string
 
 resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
   name: workflowName
   location: location
-  tags: customTags
+  tags: tags
   properties: {
     state: 'Enabled'
     definition: {

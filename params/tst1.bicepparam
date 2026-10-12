@@ -1,6 +1,5 @@
 using '../main.bicep'
 
-param appInsightsName = 'TSTRWDINFAI1401'
 param channelInterfaces = [
   'epr-alerts-manage-account-non-prod'
   'epr-alerts-manage-liabilities-non-prod'
@@ -14,4 +13,3 @@ param channelInterfaceDefault = 'epr-alerts-platform-non-prod'
 param environmentNumber = '1'
 param environmentType = 'TST'
 param keyVaultName = 'TSTRWDINFKV1401'
-param logAnalyticsWorkspaceName = 'TSTRWDINFLA1401'

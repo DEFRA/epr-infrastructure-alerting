@@ -1,15 +1,15 @@
-param alertName string
 param actionGroupIds string[]
+param alertName string
+param channel string
 param description string
+param metricName string = 'HealthCheckStatus'
 param targetResourceName string
 param targetResourceGroup string = ''
 param targetResourceRegion string = resourceGroup().location
 param targetResourceType string = 'Microsoft.Web/sites'
-param channel string
-param metricName string = 'HealthCheckStatus'
-param threshold int = 100
 param severity int = 2
-param customTags object = {}
+param tags object = {}
+param threshold int = 100
 
 var resolvedTargetResourceGroup = empty(targetResourceGroup) ? resourceGroup().name : targetResourceGroup
 var targetResourceId = resourceId(resolvedTargetResourceGroup, targetResourceType, targetResourceName)
@@ -17,7 +17,7 @@ var targetResourceId = resourceId(resolvedTargetResourceGroup, targetResourceTyp
 resource healthCheckAlert 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
   name: alertName
   location: 'global'
-  tags: customTags
+  tags: tags
   properties: {
     actions: [for id in actionGroupIds: {
       actionGroupId: id
