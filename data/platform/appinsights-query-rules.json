@@ -36,7 +36,7 @@
       "windowSize": "PT5M",
       "query": "traces | where message contains 'File Uploaded to blob storage'",
       "scopeResourceType": "AppInsights",
-      "scopeResourceId": "/subscriptions/8f549c59-2438-4495-b571-705081e497e4/resourceGroups/PRERWDINFRG1401/providers/Microsoft.Insights/components/PRERWDINFAI1401",
+      "scopeResourceId": "/subscriptions/3e221459-e830-4994-9d4d-38c14677cbe8/resourceGroups/PRERWDINFRG1401/providers/Microsoft.Insights/components/PRERWDINFAI1401",
       "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal",
       "channel": "epr-alerts-platform-prod"
     }
@@ -50,7 +50,7 @@
       "windowSize": "PT5M",
       "query": "traces | where message contains 'File Uploaded to blob storage'",
       "scopeResourceType": "AppInsights",
-      "scopeResourceId": "/subscriptions/8f549c59-2438-4495-b571-705081e497e4/resourceGroups/PRDRWDINFRG1401/providers/Microsoft.Insights/components/PRDRWDINFAI1401",
+      "scopeResourceId": "/subscriptions/485cd0f0-3b4c-4e1e-9899-d6c9c1f90367/resourceGroups/PRDRWDINFRG1401/providers/Microsoft.Insights/components/PRDRWDINFAI1401",
       "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal",
       "channel": "epr-alerts-platform-prod"
     }
