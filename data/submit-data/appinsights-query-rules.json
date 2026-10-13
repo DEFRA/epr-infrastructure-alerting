@@ -13,7 +13,46 @@
       "channel": "epr-alerts-submit-data-non-prod"
     }
   ],
-  "TST1": [],
-  "PRE1": [],
-  "PRD1": []
+  "TST1": [
+    {
+      "nameSuffix": "AppInsights-Synapse-PipelineRun-Failed",
+      "description": "A Synapse integration pipeline run failed in the last 30 minutes (TST1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT30M",
+      "windowSize": "PT30M",
+      "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\" | summarize arg_max(TimeGenerated, *) by RunId | extend WorkspaceName = tostring(split(_ResourceId, \"/\")[8]) | project FailureTimestamp = coalesce(End, TimeGenerated), PipelineName, RunId, WorkspaceName, _ResourceId",
+      "scopeResourceType": "LogAnalytics",
+      "scopeResourceId": "/subscriptions/a3d66c10-9ea5-4d60-adc4-211310f5ea53/resourceGroups/TSTEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/TSTEPDINFLAW1401",
+      "runbookUrl": "",
+      "channel": "epr-alerts-submit-data-non-prod"
+    }
+  ],
+  "PRE1": [
+    {
+      "nameSuffix": "AppInsights-Synapse-PipelineRun-Failed",
+      "description": "A Synapse integration pipeline run failed in the last 30 minutes (PRE1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT30M",
+      "windowSize": "PT30M",
+      "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\" | summarize arg_max(TimeGenerated, *) by RunId | extend WorkspaceName = tostring(split(_ResourceId, \"/\")[8]) | project FailureTimestamp = coalesce(End, TimeGenerated), PipelineName, RunId, WorkspaceName, _ResourceId",
+      "scopeResourceType": "LogAnalytics",
+      "scopeResourceId": "/subscriptions/3e221459-e830-4994-9d4d-38c14677cbe8/resourceGroups/PREEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/PREEPDINFLAW1401",
+      "runbookUrl": "",
+      "channel": "epr-alerts-submit-data-non-prod"
+    }
+  ],
+  "PRD1": [
+    {
+      "nameSuffix": "AppInsights-Synapse-PipelineRun-Failed",
+      "description": "A Synapse integration pipeline run failed in the last 30 minutes (PRD1 environment)",
+      "severity": 3,
+      "evaluationFrequency": "PT30M",
+      "windowSize": "PT30M",
+      "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\" | summarize arg_max(TimeGenerated, *) by RunId | extend WorkspaceName = tostring(split(_ResourceId, \"/\")[8]) | project FailureTimestamp = coalesce(End, TimeGenerated), PipelineName, RunId, WorkspaceName, _ResourceId",
+      "scopeResourceType": "LogAnalytics",
+      "scopeResourceId": "/subscriptions/485cd0f0-3b4c-4e1e-9899-d6c9c1f90367/resourceGroups/PRDEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/PRDEPDINFLAW1401",
+      "runbookUrl": "",
+      "channel": "epr-alerts-submit-data-prod"
+    }
+  ]
 }
