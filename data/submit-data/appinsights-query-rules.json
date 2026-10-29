@@ -46,7 +46,7 @@
       "nameSuffix": "AppInsights-Synapse-PipelineRun-Failed",
       "description": "A Synapse integration pipeline run failed in the last 30 minutes (PRD1 environment)",
       "severity": 3,
-      "evaluationFrequency": "PT30M",
+      "evaluationFrequency": "PT15M",
       "windowSize": "PT30M",
       "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\" | summarize arg_max(TimeGenerated, *) by RunId | extend WorkspaceName = tostring(split(_ResourceId, \"/\")[8]) | project FailureTimestamp = coalesce(End, TimeGenerated), PipelineName, RunId, WorkspaceName, _ResourceId",
       "scopeResourceType": "LogAnalytics",
