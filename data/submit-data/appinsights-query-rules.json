@@ -51,7 +51,7 @@
       "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\" | summarize arg_max(TimeGenerated, *) by RunId | extend WorkspaceName = tostring(split(_ResourceId, \"/\")[8]) | project FailureTimestamp = coalesce(End, TimeGenerated), PipelineName, RunId, WorkspaceName, _ResourceId",
       "scopeResourceType": "LogAnalytics",
       "scopeResourceId": "/subscriptions/485cd0f0-3b4c-4e1e-9899-d6c9c1f90367/resourceGroups/PRDEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/PRDEPDINFLAW1401",
-      "runbookUrl": "",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6631751967/Synapse+pipeline+run+failed+in+production+PRD1+-+runbook",
       "channel": "epr-alerts-submit-data-prod"
     }
   ]
