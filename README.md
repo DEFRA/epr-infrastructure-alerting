@@ -51,6 +51,7 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 - Common Alert Schema processor Logic App
   - File: `modules/logicApp/slack-commonAlertSchema.bicep`
   - Purpose: receives Common Alert Schema payloads, builds a router payload of shape `{ channelName, payload }`, and forwards to router.
+  - For Event Grid (Key Vault) alerts, adds the secret/certificate name, vault name and expiry from `data.alertContext.event` to the Slack message.
 
 - Channel router Logic App
   - File: `modules/logicApp/slack-router.bicep`

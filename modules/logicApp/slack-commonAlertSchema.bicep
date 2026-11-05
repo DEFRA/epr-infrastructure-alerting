@@ -67,6 +67,28 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
           inputs: '@{coalesce(string(triggerBody()?[\'data\']?[\'essentials\']?[\'alertTargetIDs\']?[0]), \'NOTSET\')}'
           runAfter: {}
         }
+        // Event Grid (Key Vault) alerts carry the source CloudEvent in data.alertContext.event
+        Get_Event_Object_Name: {
+          type: 'Compose'
+          inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'data\']?[\'ObjectName\'], triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'subject\'], \'\')))}'
+          runAfter: {}
+        }
+        Get_Event_Object_Type: {
+          type: 'Compose'
+          inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'data\']?[\'ObjectType\'], \'Object\')))}'
+          runAfter: {}
+        }
+        Get_Event_Vault_Name: {
+          type: 'Compose'
+          inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'data\']?[\'VaultName\'], \'NOTSET\')))}'
+          runAfter: {}
+        }
+        // EXP is Unix epoch seconds; coalesce to 0 because if() evaluates both branches
+        Get_Event_Expiry_Display: {
+          type: 'Compose'
+          inputs: '@{if(equals(int(string(coalesce(triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'data\']?[\'EXP\'], 0))), 0), \'Not set\', concat(addSeconds(\'1970-01-01T00:00:00Z\', int(string(coalesce(triggerBody()?[\'data\']?[\'alertContext\']?[\'event\']?[\'data\']?[\'EXP\'], 0))), \'yyyy-MM-dd HH:mm\'), \' UTC\'))}'
+          runAfter: {}
+        }
         Get_Investigation_Link: {
           type: 'Compose'
           inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'essentials\']?[\'investigationLink\'], \'\')))}'
@@ -197,6 +219,46 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             Initialize_Slack_Blocks: [ 'Succeeded' ]
           }
         }
+        Add_Event_Object_Section_If_Present: {
+          type: 'If'
+          expression: '@not(empty(outputs(\'Get_Event_Object_Name\')))'
+          actions: {
+            Append_Event_Object_Section: {
+              type: 'AppendToArrayVariable'
+              inputs: {
+                name: 'SlackBlocks'
+                value: {
+                  type: 'section'
+                  fields: [
+                    {
+                      type: 'mrkdwn'
+                      text: '*@{outputs(\'Get_Event_Object_Type\')}:*\n`@{outputs(\'Get_Event_Object_Name\')}`'
+                    }
+                    {
+                      type: 'mrkdwn'
+                      text: '*Key Vault:*\n`@{outputs(\'Get_Event_Vault_Name\')}`'
+                    }
+                    {
+                      type: 'mrkdwn'
+                      text: '*Expires:*\n@{outputs(\'Get_Event_Expiry_Display\')}'
+                    }
+                  ]
+                }
+              }
+              runAfter: {}
+            }
+          }
+          else: {
+            actions: {}
+          }
+          runAfter: {
+            Add_Runbook_Section_If_Present: [ 'Succeeded' ]
+            Get_Event_Object_Name: [ 'Succeeded' ]
+            Get_Event_Object_Type: [ 'Succeeded' ]
+            Get_Event_Vault_Name: [ 'Succeeded' ]
+            Get_Event_Expiry_Display: [ 'Succeeded' ]
+          }
+        }
         Append_Resource_Section: {
           type: 'AppendToArrayVariable'
           inputs: {
@@ -210,7 +272,7 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             }
           }
           runAfter: {
-            Add_Runbook_Section_If_Present: [ 'Succeeded' ]
+            Add_Event_Object_Section_If_Present: [ 'Succeeded' ]
           }
         }
         // AppendToArrayVariable only accepts one item; divider must be a separate append
