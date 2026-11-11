@@ -118,6 +118,7 @@ module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [
       alertName: 'HealthCheckAlert-${target.targetName}-${target.channel}'
       channel: target.channel
       description: target.description
+      environmentType: environmentType
       metricName: 'HealthCheckStatus'
       tags: union(environmentScopedTags, {
         AlertType: 'HealthCheck'
