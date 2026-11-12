@@ -5,7 +5,10 @@
     "eventTypes": [
       "Microsoft.KeyVault.SecretExpired"
     ],
-    "severity": "Sev1"
+    "severity": "Sev1",
+    "excludedObjectNamePrefixes": [
+      "boomi-"
+    ]
   },
   {
     "nameSuffix": "SecretNearExpiry",
@@ -13,7 +16,10 @@
     "eventTypes": [
       "Microsoft.KeyVault.SecretNearExpiry"
     ],
-    "severity": "Sev2"
+    "severity": "Sev2",
+    "excludedObjectNamePrefixes": [
+      "boomi-"
+    ]
   },
   {
     "nameSuffix": "SecretNewVersion",
@@ -29,7 +35,10 @@
     "eventTypes": [
       "Microsoft.KeyVault.CertificateExpired"
     ],
-    "severity": "Sev1"
+    "severity": "Sev1",
+    "excludedObjectNamePrefixes": [
+      "boomi-"
+    ]
   },
   {
     "nameSuffix": "CertificateNearExpiry",
@@ -37,7 +46,10 @@
     "eventTypes": [
       "Microsoft.KeyVault.CertificateNearExpiry"
     ],
-    "severity": "Sev2"
+    "severity": "Sev2",
+    "excludedObjectNamePrefixes": [
+      "boomi-"
+    ]
   },
   {
     "nameSuffix": "CertificateNewVersion",
@@ -46,5 +58,29 @@
       "Microsoft.KeyVault.CertificateNewVersionCreated"
     ],
     "severity": "Sev3"
+  },
+  {
+    "nameSuffix": "BoomiNearExpiry",
+    "description": "An Alert has been raised because a Boomi secret or certificate has 30 days left before expiry",
+    "eventTypes": [
+      "Microsoft.KeyVault.SecretNearExpiry",
+      "Microsoft.KeyVault.CertificateNearExpiry"
+    ],
+    "severity": "Sev1",
+    "objectNamePrefixes": [
+      "boomi-"
+    ]
+  },
+  {
+    "nameSuffix": "BoomiExpired",
+    "description": "An Alert has been raised because a Boomi secret or certificate has expired",
+    "eventTypes": [
+      "Microsoft.KeyVault.SecretExpired",
+      "Microsoft.KeyVault.CertificateExpired"
+    ],
+    "severity": "Sev1",
+    "objectNamePrefixes": [
+      "boomi-"
+    ]
   }
 ]

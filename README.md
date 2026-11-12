@@ -18,7 +18,8 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 | Alert Type | Primary File(s) To Edit | Notes |
 | --- | --- | --- |
 | Health check metric alerts (Web Apps / Function Apps) | `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json` | Add or update target entries; `main.bicep` loops these files into metric alert module deployments. |
-| Key Vault secret/certificate lifecycle alerts | `data/platform/keyvault-event-subscriptions.json` | Add event subscription definitions (event type, severity, name suffix) routed through MonitorAlert destination to the generic action group. |
+| Key Vault secret/certificate lifecycle alerts | `data/platform/keyvault-event-subscriptions.json` | Add event subscription definitions (event type, severity, name suffix, optional secret/certificate name filters) routed through MonitorAlert destination to the generic action group. See [Key Vault Alerts: Specific Secrets And Team Routing](#key-vault-alerts-specific-secrets-and-team-routing-). |
+| Key Vault secret/certificate routing to a team channel | `data/<team-folder>/keyvault-secret-routes.json` | Map secret/certificate names or prefixes to your team's channel, per environment. |
 | ACR vulnerability log query alerts | `data/platform/acr-vulnerability-query-rules.json` | Add scheduled query rule objects (name suffix, severity, KQL query). |
 | App Insights query alerts | `data/team1/appinsights-query-rules.json` | Add query definitions with `channel` and `runbookUrl` custom properties. |
 | Notification processing and routing | `modules/logicApp/slack-commonAlertSchema.bicep`, `modules/logicApp/slack-router.bicep`, `modules/logicApp/slack-channelInterface.bicep`, `modules/actionGroup/generic.bicep` | Edit when changing alert payload formatting, routing, or Slack channel delivery behavior. |
@@ -74,6 +75,11 @@ This repository contains the shared alerting infrastructure for EPR. The deploym
 - Event Subscriptions for secret/certificate lifecycle events
   - File: `modules/eventSubscription.bicep`
   - Data: `data/platform/keyvault-event-subscriptions.json`
+  - Optional Event Grid filters limit a subscription to specific secrets/certificates.
+
+- Team routing for Key Vault alerts
+  - Data: `data/<team-folder>/keyvault-secret-routes.json`
+  - Applied by the processor Logic App using the secret/certificate name from the event.
 
 ### Metric Alerts (Health Check) ❤️
 
@@ -99,7 +105,10 @@ The deployment uses JSON data files for repeatable alert definitions:
   - Defines target resource names/resource groups and description for health alerts.
 
 - `data/platform/keyvault-event-subscriptions.json`
-  - Defines Key Vault event types, severities, and name suffixes.
+  - Defines Key Vault event types, severities, name suffixes, and optional secret/certificate name filters.
+
+- `data/<team-folder>/keyvault-secret-routes.json`
+  - Maps Key Vault secret/certificate names or prefixes to a team channel, per environment.
 
 - `data/platform/acr-vulnerability-query-rules.json`
   - Defines KQL query rules, severities, and naming for ACR vulnerability alerts.
@@ -110,8 +119,11 @@ The deployment uses JSON data files for repeatable alert definitions:
 Custom property routing note 🧠:
 
 - Query/metric alert definitions include `channel` in `customProperties`.
-- Processor/router logic uses this channel value for route selection.
-- If `channel` is missing or empty, route defaults to `epr-alerts-platform-non-prod`.
+- Key Vault (Event Grid) alerts cannot carry custom properties, so they are routed by secret/certificate name using `keyvault-secret-routes.json`.
+- The processor picks the channel in this order:
+  1. `customProperties.channel` on the alert rule.
+  2. A matching Key Vault secret/certificate route.
+  3. `epr-alerts-platform-non-prod`. If that channel is not deployed in the environment, the router falls back to `channelInterfaceDefault`.
 
 Parameter-driven channel mapping 🗺️:
 
@@ -134,6 +146,100 @@ Important ⚠️:
 - Ensure each environment key exists, even if the value is an empty array.
 - Keep resource names and groups aligned with existing deployed resources to avoid accidental creates.
 
+## Key Vault Alerts: Specific Secrets And Team Routing 🔐
+
+By default every Key Vault event subscription fires for every secret or certificate in the vault, and the alert goes to the platform channel. There are two independent controls:
+
+- **Filtering** decides *whether* an alert fires. It is configured on the event subscription and applies in every environment.
+- **Routing** decides *which channel* an alert goes to. It is configured by each team and is environment-specific.
+
+The secret/certificate name is the Event Grid event `subject` (also `data.ObjectName` in the alert payload).
+
+### Filtering: alert on specific secrets/certificates only
+
+Add any of these optional fields to an entry in `data/platform/keyvault-event-subscriptions.json`:
+
+| Field | Event Grid filter | Effect |
+| --- | --- | --- |
+| `objectNames` | `StringIn` on `subject` | Only these exact names. |
+| `objectNamePrefixes` | `StringBeginsWith` on `subject` | Only names starting with one of these prefixes. |
+| `excludedObjectNames` | `StringNotIn` on `subject` | Every name except these. |
+| `excludedObjectNamePrefixes` | `StringNotBeginsWith` on `subject` | Every name except those starting with one of these prefixes. |
+
+Example: Boomi secrets and certificates (`boomi-*`) have their own Sev1 alerts, owned by the platform team. The vault-wide expiry alerts exclude them, so each Boomi event alerts once.
+
+```json
+{
+  "nameSuffix": "BoomiNearExpiry",
+  "description": "An Alert has been raised because a Boomi secret or certificate has 30 days left before expiry",
+  "eventTypes": [
+    "Microsoft.KeyVault.SecretNearExpiry",
+    "Microsoft.KeyVault.CertificateNearExpiry"
+  ],
+  "severity": "Sev1",
+  "objectNamePrefixes": ["boomi-"]
+},
+{
+  "nameSuffix": "SecretNearExpiry",
+  "description": "An Alert has been raised because a Key Vault secret has 30 days left before expiry",
+  "eventTypes": ["Microsoft.KeyVault.SecretNearExpiry"],
+  "severity": "Sev2",
+  "excludedObjectNamePrefixes": ["boomi-"]
+}
+```
+
+`BoomiExpired`, `SecretExpired`, `CertificateExpired` and `CertificateNearExpiry` follow the same pattern. The `SecretNewVersion` and `CertificateNewVersion` alerts stay vault-wide, because no Boomi-specific new-version alert exists.
+
+Rules and limits ⚠️:
+
+- Event Grid ANDs filters together. Use `objectNames` **or** `objectNamePrefixes` in one entry, not both, otherwise a name has to match both. The `excluded*` fields can be combined with either.
+- Matching is case-insensitive. No wildcards or regex.
+- At most 25 values in total across the filters of one entry.
+- Filters only match on names. Key Vault tags are not in the event, so they cannot be used.
+- The file is not environment-keyed. A name that does not exist in an environment's vault simply never matches.
+- Adding a filtered entry does not change the existing unfiltered entries. If a secret matches both, two alerts fire. Use `excludedObjectNames` or `excludedObjectNamePrefixes` on the unfiltered entry to avoid this, as the Boomi example does.
+- Entries without filter fields keep the current behaviour (whole vault).
+
+### Routing: send a team's secrets/certificates to its channel
+
+Add routes to `data/<team-folder>/keyvault-secret-routes.json`. Like the other team files, it is keyed by environment. A hypothetical example for submit-data:
+
+```json
+{
+  "DEV1": [
+    {
+      "channel": "epr-alerts-submit-data-non-prod",
+      "objectNames": ["example-submit-data-secret"],
+      "objectNamePrefixes": ["submit-data-"]
+    }
+  ],
+  "TST1": [],
+  "PRE1": [],
+  "PRD1": [
+    {
+      "channel": "epr-alerts-submit-data-prod",
+      "objectNamePrefixes": ["submit-data-"]
+    }
+  ]
+}
+```
+
+For a real example, see `data/platform/keyvault-secret-routes.json`. It routes `boomi-*` to the platform channel in each environment.
+
+How a route is chosen:
+
+- Matching is case-insensitive.
+- Exact `objectNames` matches beat prefix matches. Among prefixes, the longest matching prefix wins.
+- If nothing matches, the alert goes to the platform channel as before.
+- Routing applies to every Key Vault event type (expired, near expiry, new version). Combine it with filtering if you only want some of them.
+
+Rules ⚠️:
+
+- `channel` must be in that environment's `channelInterfaces` (`params/*.bicepparam`). Otherwise the router falls back to the default channel.
+- Each name or prefix should appear in only one team's file. If two teams claim the same exact name, which one wins is not defined.
+- Empty prefixes are ignored, because they would match everything.
+- Every environment key must exist, even if the value is an empty array.
+
 ## How To Add A New Alert Hooked To The Generic Action Group ➕
 
 Use one of these patterns depending on alert type.
@@ -146,7 +252,8 @@ Use one of these patterns depending on alert type.
 
 Examples:
 - New health check target: add an object in `data/platform/healthcheck-targets.json` or `data/team1/healthcheck-targets.json`.
-- New Key Vault event: add an object in `data/platform/keyvault-event-subscriptions.json`.
+- New Key Vault event: add an object in `data/platform/keyvault-event-subscriptions.json` (optionally filtered to specific secrets/certificates).
+- Route Key Vault alerts for your secrets/certificates to your channel: add a route in `data/<team-folder>/keyvault-secret-routes.json`.
 - New ACR query rule: add an object in `data/platform/acr-vulnerability-query-rules.json`.
 - New App Insights query rule: add an object in `data/team1/appinsights-query-rules.json`.
 

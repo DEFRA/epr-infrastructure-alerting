@@ -1,4 +1,6 @@
 param actionGroupResourceIds array
+@description('Event Grid advanced filters (ANDed together). Empty means every object in the vault.')
+param advancedFilters array = []
 param eventSubscriptionDescription string = 'Key Vault secret lifecycle event received'
 param eventSubscriptionName string
 param includedEventTypes array
@@ -16,6 +18,7 @@ resource eventSubscription 'Microsoft.EventGrid/systemTopics/eventSubscriptions@
     eventDeliverySchema: 'CloudEventSchemaV1_0'
     filter: {
       includedEventTypes: includedEventTypes
+      advancedFilters: advancedFilters
     }
     destination: {
       endpointType: 'MonitorAlert'
