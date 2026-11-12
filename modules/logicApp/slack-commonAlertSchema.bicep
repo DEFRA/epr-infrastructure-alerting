@@ -1,3 +1,5 @@
+@description('Key Vault object routes: [{ match: exact|prefix, value: lower-case name, channel }], most specific first')
+param keyVaultSecretRoutes array = []
 param location string
 @secure()
 param routerCallbackUrl string
@@ -14,6 +16,10 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
       '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
       contentVersion: '1.0.0.0'
       parameters: {
+        keyVaultSecretRoutes: {
+          type: 'Array'
+          defaultValue: []
+        }
         routerCallbackUrl: {
           type: 'SecureString'
         }
@@ -118,11 +124,31 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
           inputs: '@{trim(string(coalesce(triggerBody()?[\'data\']?[\'customProperties\']?[\'channel\'], \'\')))}'
           runAfter: {}
         }
+        // Routes are ordered most specific first, so the first match wins
+        Filter_KeyVault_Secret_Routes: {
+          type: 'Query'
+          inputs: {
+            from: '@parameters(\'keyVaultSecretRoutes\')'
+            where: '@and(not(empty(outputs(\'Get_Event_Object_Name\'))), or(and(equals(item()?[\'match\'], \'exact\'), equals(item()?[\'value\'], toLower(outputs(\'Get_Event_Object_Name\')))), and(equals(item()?[\'match\'], \'prefix\'), startsWith(toLower(outputs(\'Get_Event_Object_Name\')), string(item()?[\'value\'])))))'
+          }
+          runAfter: {
+            Get_Event_Object_Name: [ 'Succeeded' ]
+          }
+        }
+        Get_KeyVault_Route_Channel: {
+          type: 'Compose'
+          inputs: '@{trim(string(coalesce(first(body(\'Filter_KeyVault_Secret_Routes\'))?[\'channel\'], \'\')))}'
+          runAfter: {
+            Filter_KeyVault_Secret_Routes: [ 'Succeeded' ]
+          }
+        }
+        // Precedence: alert rule customProperties.channel, then Key Vault object route, then platform default
         Get_Routing_Channel: {
           type: 'Compose'
-          inputs: '@{if(empty(outputs(\'Get_Channel\')), \'epr-alerts-platform-non-prod\', toLower(outputs(\'Get_Channel\')))}'
+          inputs: '@{if(not(empty(outputs(\'Get_Channel\'))), toLower(outputs(\'Get_Channel\')), if(not(empty(outputs(\'Get_KeyVault_Route_Channel\'))), toLower(outputs(\'Get_KeyVault_Route_Channel\')), \'epr-alerts-platform-non-prod\'))}'
           runAfter: {
             Get_Channel: [ 'Succeeded' ]
+            Get_KeyVault_Route_Channel: [ 'Succeeded' ]
           }
         }
         Get_Runbook_Button_Url: {
@@ -369,6 +395,9 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
       outputs: {}
     }
     parameters: {
+      keyVaultSecretRoutes: {
+        value: keyVaultSecretRoutes
+      }
       routerCallbackUrl: {
         value: routerCallbackUrl
       }

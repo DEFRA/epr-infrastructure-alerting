@@ -30,12 +30,50 @@ var healthcheckTargets = concat(
   loadJsonContent('./data/submit-data/healthcheck-targets.json')[?environmentKey] ?? []
 )
 
+// Event Grid advanced filters on the event subject (the secret/certificate name).
+// Advanced filters are ANDed, so use objectNames OR objectNamePrefixes per entry;
+// excludedObjectNames and excludedObjectNamePrefixes can be combined with either.
+func keyVaultSubjectFilters(entry object) array => concat(
+  empty(entry.?objectNames ?? []) ? [] : [{ operatorType: 'StringIn', key: 'subject', values: entry.objectNames }],
+  empty(entry.?objectNamePrefixes ?? []) ? [] : [{ operatorType: 'StringBeginsWith', key: 'subject', values: entry.objectNamePrefixes }],
+  empty(entry.?excludedObjectNames ?? []) ? [] : [{ operatorType: 'StringNotIn', key: 'subject', values: entry.excludedObjectNames }],
+  empty(entry.?excludedObjectNamePrefixes ?? []) ? [] : [{ operatorType: 'StringNotBeginsWith', key: 'subject', values: entry.excludedObjectNamePrefixes }]
+)
+
+var keyVaultSecretRoutes = concat(
+  loadJsonContent('./data/platform/keyvault-secret-routes.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/manage-account/keyvault-secret-routes.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/manage-liabilities/keyvault-secret-routes.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/meet-obligations/keyvault-secret-routes.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/regulator-tooling/keyvault-secret-routes.json')[?environmentKey] ?? [],
+  loadJsonContent('./data/submit-data/keyvault-secret-routes.json')[?environmentKey] ?? []
+)
+
+// Flattened, lower-cased match rules for the processor Logic App. Exact names come first,
+// then prefixes longest-first, so the most specific route wins.
+var keyVaultSecretRouteRules = concat(
+  flatten(map(keyVaultSecretRoutes, route => map(route.?objectNames ?? [], name => {
+    match: 'exact'
+    value: toLower(name)
+    channel: route.channel
+  }))),
+  sort(
+    flatten(map(keyVaultSecretRoutes, route => map(filter(route.?objectNamePrefixes ?? [], prefix => !empty(prefix)), prefix => {
+      match: 'prefix'
+      value: toLower(prefix)
+      channel: route.channel
+    }))),
+    (a, b) => length(a.value) > length(b.value)
+  )
+)
+
 resource platformSecretsKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
 
 module commonAlertSchemaProcessor './modules/logicApp/slack-commonAlertSchema.bicep' = {
   params: {
+    keyVaultSecretRoutes: keyVaultSecretRouteRules
     location: location
     routerCallbackUrl: slackChannelRouter.outputs.manualTriggerCallbackUrl
     tags: environmentScopedTags
@@ -99,6 +137,7 @@ module eventSubscriptionsModules './modules/eventSubscription.bicep' = [
       actionGroupResourceIds: [
         genericActionGroup.outputs.actionGroupId
       ]
+      advancedFilters: keyVaultSubjectFilters(eventSubscription)
       eventSubscriptionDescription: eventSubscription.description
       eventSubscriptionName: '${keyVaultName}-${eventSubscription.nameSuffix}'
       includedEventTypes: eventSubscription.eventTypes
