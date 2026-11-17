@@ -155,6 +155,14 @@ By default every Key Vault event subscription fires for every secret or certific
 
 The secret/certificate name is the Event Grid event `subject` (also `data.ObjectName` in the alert payload).
 
+### Getting expiry alerts for your team's secrets
+
+1. Store the secret or certificate in the shared vault, `<ENV>RWDINFKV1401` (the `keyVaultName` in `params/<env>.bicepparam`). Secrets in other vaults raise no alerts.
+2. Set an expiry date on it. Key Vault only sends near-expiry (30 days before) and expired events for secrets that have one. To find secrets without one, list them with `az keyvault secret list --vault-name <vault> --query "[?attributes.expires==null].name"`.
+3. Optionally, route it to your team's channel (see [Routing](#routing-send-a-teams-secretscertificates-to-its-channel) below). Without a route, alerts go to the platform channel.
+
+Nothing else is needed: the vault-wide near-expiry, expired and new-version alerts already cover every secret and certificate in the vault.
+
 ### Filtering: alert on specific secrets/certificates only
 
 Add any of these optional fields to an entry in `data/platform/keyvault-event-subscriptions.json`:
