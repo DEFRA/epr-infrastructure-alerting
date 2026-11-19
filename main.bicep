@@ -12,22 +12,93 @@ var environmentScopedTags = union(globalTags, {
   Environment: environmentKey
 })
 
-var appInsightsQueryRules = concat(
-  loadJsonContent('./data/platform/appinsights-query-rules.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/manage-account/appinsights-query-rules.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/manage-liabilities/appinsights-query-rules.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/meet-obligations/appinsights-query-rules.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/regulator-tooling/appinsights-query-rules.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/submit-data/appinsights-query-rules.json')[?environmentKey] ?? []
+// One alerts.json per team folder under data/. To add a team, add a line here.
+// (Bicep can't build this list in a loop: loadJsonContent needs a literal path.)
+var teamFiles = [
+  { team: 'manage-account', config: loadJsonContent('data/manage-account/alerts.json') }
+  { team: 'manage-liabilities', config: loadJsonContent('data/manage-liabilities/alerts.json') }
+  { team: 'meet-obligations', config: loadJsonContent('data/meet-obligations/alerts.json') }
+  { team: 'platform', config: loadJsonContent('data/platform/alerts.json') }
+  { team: 'regulator-tooling', config: loadJsonContent('data/regulator-tooling/alerts.json') }
+  { team: 'submit-data', config: loadJsonContent('data/submit-data/alerts.json') }
+]
+
+// A team's alerts go to epr-alerts-<team>-prod in PRD and epr-alerts-<team>-non-prod elsewhere,
+// unless an alert sets its own `channel`.
+var channelSuffix = environmentType == 'PRD' ? 'prod' : 'non-prod'
+
+var teamConfigs = [
+  for tf in teamFiles: {
+    channel: 'epr-alerts-${tf.team}-${channelSuffix}'
+    healthChecks: tf.config.?healthChecks[?environmentKey] ?? []
+    queryAlerts: tf.config.?queryAlerts ?? []
+    keyVaultRoutes: tf.config.?keyVaultRoutes ?? []
+  }
+]
+
+var healthcheckTargets = flatten(map(teamConfigs, tc => map(tc.healthChecks, h => {
+  targetName: h.app
+  targetResourceGroup: h.resourceGroup
+  description: h.?description ?? 'Health check for ${h.app} dropped below 100% in the last 5 minutes'
+  channel: h.?channel ?? tc.channel
+})))
+
+// Query alerts are defined once per team; `environments` lists where each one is deployed,
+// with the target resource and any per-environment overrides.
+var queryAlertKinds = {
+  AppInsightsQuery: { deploymentPrefix: 'appInsights', alertCategory: 'Application', signalSource: 'AppInsights' }
+  AcrVulnerability: { deploymentPrefix: 'acrVuln', alertCategory: 'Security', signalSource: 'DefenderForCloud' }
+}
+
+var queryAlertsForEnvironment = flatten(map(teamConfigs, tc => map(
+  filter(tc.queryAlerts, a => contains(a.environments, environmentKey)),
+  a => union(a, a.environments[environmentKey], { teamChannel: tc.channel })
+)))
+
+var queryAlerts = map(queryAlertsForEnvironment, q => {
+  name: q.name
+  kind: q.?kind ?? 'AppInsightsQuery'
+  description: replace(q.?description ?? q.name, '{env}', environmentKey)
+  query: q.query
+  severity: q.?severity ?? 3
+  evaluationFrequency: q.?frequency ?? 'PT5M'
+  windowSize: q.?window ?? (q.?frequency ?? 'PT5M')
+  runbookUrl: q.?runbookUrl ?? ''
+  channel: q.?channel ?? q.teamChannel
+  scopeResourceId: q.target
+  scopeResourceType: contains(toLower(q.target), '/microsoft.operationalinsights/workspaces/') ? 'loganalytics' : 'appinsights'
+})
+
+// Event Grid advanced filters on the event subject (the secret/certificate name).
+// Advanced filters are ANDed, so use objectNames OR objectNamePrefixes per entry;
+// excludedObjectNames and excludedObjectNamePrefixes can be combined with either.
+func keyVaultSubjectFilters(entry object) array => concat(
+  empty(entry.?objectNames ?? []) ? [] : [{ operatorType: 'StringIn', key: 'subject', values: entry.objectNames }],
+  empty(entry.?objectNamePrefixes ?? []) ? [] : [{ operatorType: 'StringBeginsWith', key: 'subject', values: entry.objectNamePrefixes }],
+  empty(entry.?excludedObjectNames ?? []) ? [] : [{ operatorType: 'StringNotIn', key: 'subject', values: entry.excludedObjectNames }],
+  empty(entry.?excludedObjectNamePrefixes ?? []) ? [] : [{ operatorType: 'StringNotBeginsWith', key: 'subject', values: entry.excludedObjectNamePrefixes }]
 )
 
-var healthcheckTargets = concat(
-  loadJsonContent('./data/platform/healthcheck-targets.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/manage-account/healthcheck-targets.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/manage-liabilities/healthcheck-targets.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/meet-obligations/healthcheck-targets.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/regulator-tooling/healthcheck-targets.json')[?environmentKey] ?? [],
-  loadJsonContent('./data/submit-data/healthcheck-targets.json')[?environmentKey] ?? []
+var keyVaultSecretRoutes = flatten(map(teamConfigs, tc => map(tc.keyVaultRoutes, r => union(r, {
+  channel: r.?channel ?? tc.channel
+}))))
+
+// Flattened, lower-cased match rules for the processor Logic App. Exact names come first,
+// then prefixes longest-first, so the most specific route wins.
+var keyVaultSecretRouteRules = concat(
+  flatten(map(keyVaultSecretRoutes, route => map(route.?objectNames ?? [], name => {
+    match: 'exact'
+    value: toLower(name)
+    channel: route.channel
+  }))),
+  sort(
+    flatten(map(keyVaultSecretRoutes, route => map(filter(route.?objectNamePrefixes ?? [], prefix => !empty(prefix)), prefix => {
+      match: 'prefix'
+      value: toLower(prefix)
+      channel: route.channel
+    }))),
+    (a, b) => length(a.value) > length(b.value)
+  )
 )
 
 resource platformSecretsKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
@@ -36,6 +107,8 @@ resource platformSecretsKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing
 
 module commonAlertSchemaProcessor './modules/logicApp/slack-commonAlertSchema.bicep' = {
   params: {
+    defaultChannel: channelInterfaceDefault
+    keyVaultSecretRoutes: keyVaultSecretRouteRules
     location: location
     routerCallbackUrl: slackChannelRouter.outputs.manualTriggerCallbackUrl
     tags: environmentScopedTags
@@ -99,6 +172,7 @@ module eventSubscriptionsModules './modules/eventSubscription.bicep' = [
       actionGroupResourceIds: [
         genericActionGroup.outputs.actionGroupId
       ]
+      advancedFilters: keyVaultSubjectFilters(eventSubscription)
       eventSubscriptionDescription: eventSubscription.description
       eventSubscriptionName: '${keyVaultName}-${eventSubscription.nameSuffix}'
       includedEventTypes: eventSubscription.eventTypes
@@ -129,54 +203,27 @@ module healthCheckAlerts './modules/metricAlert/healthCheck-webApp.bicep' = [
   }
 ]
 
-module acrVulnerabilityAlerts './modules/scheduledQueryRule.bicep' = [
-  for rule in loadJsonContent('./data/platform/acr-vulnerability-query-rules.json')[?environmentKey] ?? []: {
-    name: 'acrVuln-${uniqueString('${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}')}'
+module queryAlertRules './modules/scheduledQueryRule.bicep' = [
+  for rule in queryAlerts: {
+    name: '${queryAlertKinds[rule.kind].deploymentPrefix}-${uniqueString('${rule.name}-${rule.channel}-${environmentType}${environmentNumber}')}'
     params: {
       actionGroupId: genericActionGroup.outputs.actionGroupId
-      alertName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
+      alertName: '${rule.name}-${rule.channel}-${environmentType}${environmentNumber}'
       customProperties: {
-        AlertCategory: 'Security'
+        AlertCategory: queryAlertKinds[rule.kind].alertCategory
         channel: rule.channel
         runbookUrl: rule.runbookUrl
-        SignalSource: 'DefenderForCloud'
+        SignalSource: queryAlertKinds[rule.kind].signalSource
       }
       description: rule.description
-      displayName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
+      displayName: '${rule.name}-${rule.channel}-${environmentType}${environmentNumber}'
       evaluationFrequency: rule.evaluationFrequency
       query: rule.query
       scopeResourceId: rule.scopeResourceId
-      scopeResourceType: any(toLower(string(rule.scopeResourceType)))
+      scopeResourceType: any(rule.scopeResourceType)
       severity: rule.severity
       tags: union(environmentScopedTags, {
-        AlertType: 'AcrVulnerability'
-      })
-      windowSize: rule.windowSize
-    }
-  }
-]
-
-module appInsightsQueryAlerts './modules/scheduledQueryRule.bicep' = [
-  for rule in appInsightsQueryRules: {
-    name: 'appInsights-${uniqueString('${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}')}'
-    params: {
-      actionGroupId: genericActionGroup.outputs.actionGroupId
-      alertName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
-      customProperties: {
-        AlertCategory: 'Application'
-        channel: rule.channel
-        runbookUrl: rule.runbookUrl
-        SignalSource: 'AppInsights'
-      }
-      description: rule.description
-      displayName: '${rule.nameSuffix}-${rule.channel}-${environmentType}${environmentNumber}'
-      evaluationFrequency: rule.evaluationFrequency
-      query: rule.query
-      scopeResourceId: rule.scopeResourceId
-      scopeResourceType: any(toLower(string(rule.scopeResourceType)))
-      severity: rule.severity
-      tags: union(environmentScopedTags, {
-        AlertType: 'AppInsightsQuery'
+        AlertType: rule.kind
       })
       windowSize: rule.windowSize
     }

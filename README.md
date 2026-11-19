@@ -1,242 +1,229 @@
-# Shared Alerting (Bicep) 🚨
+# EPR Shared Alerting 🚨
 
-This repository contains the shared alerting infrastructure for EPR. The deployment is driven from `main.bicep` and routes Azure Monitor alerts through a generic Action Group into a Common Alert Schema processor Logic App, then through a channel router to channel-specific Slack channel interface Logic Apps.
+Sends EPR Azure alerts to Slack. Teams add alerts by editing JSON files in `data/`, and a pipeline deploys them to every environment.
 
-## Quick Start 🚀
+## How it works
 
-1. From the repository root, review `main.bicep` and `params/dev1.bicepparam`.
-2. Update or add alert definitions in the JSON files under `data/`.
-3. Validate the deployment:
-  - `az deployment group validate --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
-4. Run what-if to preview changes:
-  - `az deployment group what-if --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
-5. Deploy when changes look correct:
-  - `az deployment group create --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
+```mermaid
+flowchart LR
+    subgraph Sources["Alert sources"]
+        HC["Health check<br/>metric alerts"]
+        LQ["Log query alerts<br/>App Insights, Synapse, ACR"]
+        KV["Key Vault events<br/>via Event Grid"]
+    end
 
-## Which File Do I Edit? 🧭
+    AG["Action Group<br/>(one per environment)"]
+    P["Processor Logic App<br/>formats the message<br/>and picks the channel"]
+    R["Router Logic App"]
+    C["Channel Logic App<br/>(one per Slack channel)"]
+    S(["Slack"])
 
-| Alert Type | Primary File(s) To Edit | Notes |
-| --- | --- | --- |
-| Health check metric alerts (Web Apps / Function Apps) | `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json` | Add or update target entries; `main.bicep` loops these files into metric alert module deployments. |
-| Key Vault secret/certificate lifecycle alerts | `data/platform/keyvault-event-subscriptions.json` | Add event subscription definitions (event type, severity, name suffix) routed through MonitorAlert destination to the generic action group. |
-| ACR vulnerability log query alerts | `data/platform/acr-vulnerability-query-rules.json` | Add scheduled query rule objects (name suffix, severity, KQL query). |
-| App Insights query alerts | `data/team1/appinsights-query-rules.json` | Add query definitions with `channel` and `runbookUrl` custom properties. |
-| Notification processing and routing | `modules/logicApp/slack-commonAlertSchema.bicep`, `modules/logicApp/slack-router.bicep`, `modules/logicApp/slack-channelInterface.bicep`, `modules/actionGroup/generic.bicep` | Edit when changing alert payload formatting, routing, or Slack channel delivery behavior. |
-| Deployment parameters (environment-specific names and channel mappings) | `params/dev1.bicepparam`, `params/tst1.bicepparam` | Update Key Vault and Log Analytics names/resource groups and `channelInterfaces` channel-name list per environment. |
+    HC --> AG
+    LQ --> AG
+    KV --> AG
+    AG --> P --> R --> C --> S
+```
 
-## Entry Point 📍
+1. **Alert sources** fire. Each one is defined in a JSON file under `data/`.
+2. **Every alert goes to one Action Group**, which calls the processor.
+3. **The processor** turns the alert into a Slack message and decides which channel it goes to. For Key Vault alerts it adds the secret name, vault and expiry date.
+4. **The router** passes the message to the Logic App for that channel.
+5. **The channel Logic App** posts it to Slack, using the webhook stored in the Key Vault as `slack-webhook-<channel>`.
 
-- Template entry point: `main.bicep`
-- Environment parameters: `params/dev1.bicepparam`, `params/tst1.bicepparam`
-- Pipeline entry point: `pipelines/validate-and-deploy.yaml`
+## Which channel does an alert go to?
 
-## How The Templates Work 🏗️
+Each team's alerts go to that team's channel: `epr-alerts-<team>-prod` in PRD and `epr-alerts-<team>-non-prod` everywhere else. An alert can set `channel` to override this.
 
-`main.bicep` orchestrates all resources and modules in this order:
+```mermaid
+flowchart TD
+    A["Alert arrives"] --> B{"Health check or<br/>query alert?"}
+    B -- Yes --> T["Its team's channel,<br/>or its 'channel' override"]
+    B -- "No: Key Vault alert" --> D{"Secret name matches a<br/>team's keyVaultRoutes?"}
+    D -- Yes --> TR["That team's channel"]
+    D -- No --> PL["Environment default channel<br/>(platform)"]
+```
 
-1. References an existing Log Analytics workspace.
-2. Deploys the Common Alert Schema processor Logic App (`slack-commonAlertSchema`).
-3. Deploys Slack channel interface Logic Apps for each entry in `channelInterfaces`.
-4. Deploys the channel router Logic App and wires interface callback URLs.
-5. Deploys a generic Action Group wired to the processor Logic App callback URL.
-6. Deploys a Key Vault Event Grid System Topic.
-7. Deploys Event Grid subscriptions from JSON config and routes them to Azure Monitor alerts with the generic Action Group.
-8. Deploys health check metric alerts from JSON config and routes them to the generic Action Group.
-9. Deploys ACR and App Insights scheduled query alerts from JSON config and routes them to the generic Action Group.
+If the channel isn't deployed in that environment (`channelInterfaces` in `params/<env>.bicepparam`), the alert goes to the environment default instead.
 
-## What Gets Created 📦
+## Which file do I edit?
 
-### Notification and Routing 🔁
+Each team has one file: `data/<team>/alerts.json`. `<team>` is one of `manage-account`, `manage-liabilities`, `meet-obligations`, `platform`, `regulator-tooling` or `submit-data`.
 
-- Common Alert Schema processor Logic App
-  - File: `modules/logicApp/slack-commonAlertSchema.bicep`
-  - Purpose: receives Common Alert Schema payloads, builds a router payload of shape `{ channelName, payload }`, and forwards to router.
-  - For Event Grid (Key Vault) alerts, adds the secret/certificate name, vault name and expiry from `data.alertContext.event` to the Slack message.
+| I want to... | Edit |
+| --- | --- |
+| Alert when a web or function app's health check fails | `healthChecks` in `data/<team>/alerts.json` |
+| Alert on an App Insights or Log Analytics query | `queryAlerts` in `data/<team>/alerts.json` |
+| Send alerts for my team's Key Vault secrets to my team's channel | `keyVaultRoutes` in `data/<team>/alerts.json` |
+| Get expiry alerts for a secret or certificate | Nothing. See [Key Vault alerts](#key-vault-alerts). |
+| Change which Key Vault events alert, or their severity | `data/platform/keyvault-event-subscriptions.json` |
+| Add a team | Add a folder with an `alerts.json`, and one line to `teamFiles` in `main.bicep` |
+| Add a Slack channel to an environment | `params/<env>.bicepparam` (`channelInterfaces`), plus a `slack-webhook-<channel>` secret in that environment's vault |
+| Change the Slack message format or routing logic | `modules/logicApp/slack-commonAlertSchema.bicep` |
 
-- Channel router Logic App
-  - File: `modules/logicApp/slack-router.bicep`
-  - Purpose: routes payloads to channel interface Logic Apps based on `channelName` (defaults to `epr-alerts-platform-non-prod`).
+### alerts.json
 
-- Channel interface Logic Apps
-  - File: `modules/logicApp/slack-channelInterface.bicep`
-  - Purpose: pass-through posting of already-formatted Slack payload to channel-specific webhook URL.
-
-- Generic Action Group
-  - File: `modules/actionGroup/generic.bicep`
-  - Purpose: central alert action target used by alert rules; invokes the Common Alert Schema processor.
-  - Important: `useCommonAlertSchema` is enabled for Logic App and webhook receivers. ⚠️
-
-### Key Vault Event Alerts 🔐
-
-- Key Vault System Topic
-  - File: `modules/systemTopic.bicep`
-
-- Event Subscriptions for secret/certificate lifecycle events
-  - File: `modules/eventSubscription.bicep`
-  - Data: `data/platform/keyvault-event-subscriptions.json`
-
-### Metric Alerts (Health Check) ❤️
-
-- Health check metric alerts for web targets
-  - Module implementation: `modules/metricAlert/healthCheck-webApp.bicep`
-  - Data: `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json`
-
-### Log Alerts (ACR Vulnerabilities) 🛡️
-
-- Scheduled query rules for ACR vulnerability findings
-  - Resource type: `Microsoft.Insights/scheduledQueryRules@2023-12-01`
-  - Data: `data/platform/acr-vulnerability-query-rules.json`
-
-- Scheduled query rules for App Insights traces
-  - Resource type: `Microsoft.Insights/scheduledQueryRules@2023-12-01`
-  - Data: `data/team1/appinsights-query-rules.json`
-
-## Data-Driven Configuration 🧩
-
-The deployment uses JSON data files for repeatable alert definitions:
-
-- `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json`
-  - Defines target resource names/resource groups and description for health alerts.
-
-- `data/platform/keyvault-event-subscriptions.json`
-  - Defines Key Vault event types, severities, and name suffixes.
-
-- `data/platform/acr-vulnerability-query-rules.json`
-  - Defines KQL query rules, severities, and naming for ACR vulnerability alerts.
-
-- `data/team1/appinsights-query-rules.json`
-  - Defines App Insights query rules, severities, naming, and custom channel metadata.
-
-Custom property routing note 🧠:
-
-- Query/metric alert definitions include `channel` in `customProperties`.
-- Processor/router logic uses this channel value for route selection.
-- If `channel` is missing or empty, route defaults to `epr-alerts-platform-non-prod`.
-
-Parameter-driven channel mapping 🗺️:
-
-- `channelInterfaces` is an array parameter in `main.bicep`.
-- Each entry is a Slack channel name string (for example `epr-alerts-platform-non-prod`).
-- The corresponding Key Vault secret is derived as `slack-webhook-${channelName}`.
-- Configure per environment in bicepparam files.
-
-## Health Check Configuration By Environment 🏷️
-
-Healthcheck targets are environment-keyed in JSON and selected in `main.bicep` using `${environmentType}${environmentNumber}` (for example `DEV1`, `TST1`).
-
-Current data shape:
-
-- `data/platform/healthcheck-targets.json` and `data/team1/healthcheck-targets.json` contain objects keyed by environment (`DEV1`, `TST1`, `PRE1`, `PRE2`, `PRD1`).
-- Each environment key contains an array of target objects (`targetName`, `targetResourceGroup`, `description`, `channel`).
-
-Important ⚠️:
-
-- Ensure each environment key exists, even if the value is an empty array.
-- Keep resource names and groups aligned with existing deployed resources to avoid accidental creates.
-
-## How To Add A New Alert Hooked To The Generic Action Group ➕
-
-Use one of these patterns depending on alert type.
-
-### Pattern A: Add Another Instance Of An Existing Alert Type (No New Bicep Module) 🧱
-
-1. Update the relevant JSON file in `data/`.
-2. Keep required fields aligned with existing objects.
-3. Run validate/what-if/deploy.
-
-Examples:
-- New health check target: add an object in `data/platform/healthcheck-targets.json` or `data/team1/healthcheck-targets.json`.
-- New Key Vault event: add an object in `data/platform/keyvault-event-subscriptions.json`.
-- New ACR query rule: add an object in `data/platform/acr-vulnerability-query-rules.json`.
-- New App Insights query rule: add an object in `data/team1/appinsights-query-rules.json`.
-
-All of these are already wired in `main.bicep` to pass the generic Action Group resource ID.
-
-### Pattern B: Add A Brand-New Alert Type 🆕
-
-1. Create a new module under `modules/` (or inline resource in `main.bicep`).
-2. Accept an `actionGroupIds`/`actionGroupId` parameter.
-3. Wire alert actions to `genericActionGroup.outputs.actionGroupId`.
-4. Add any new data file and loop in `main.bicep` if you want multiple instances.
-
-Key wiring in `main.bicep`:
-
-- For Metric Alerts (`Microsoft.Insights/metricAlerts`):
-  - Set `properties.actions[].actionGroupId` to `genericActionGroup.outputs.actionGroupId`.
-
-- For Scheduled Query Rules (`Microsoft.Insights/scheduledQueryRules`):
-  - Set `properties.actions.actionGroups` to include `genericActionGroup.outputs.actionGroupId`.
-
-- For Event Grid MonitorAlert destination:
-  - Set `destination.properties.actionGroups` to include `genericActionGroup.outputs.actionGroupId`.
-
-## Walkthrough: Add A Healthcheck Alert 👥
-
-Ensure you have a `healthcheck-targets.json` file in the folder for your team:
-
-- `data/<team-folder>/healthcheck-targets.json`
-
-Steps:
-
-1. Pick the correct environment array (`DEV1`, `TST1`, `PRE1`, `PRD1`).
-2. Add a new object with `targetName`, `targetResourceGroup`, `description`, and `channel`.
-3. Run validate/what-if from this README before raising a PR.
-
-Example:
+Only `app`, `resourceGroup`, `name`, `query` and `target` are required. Everything else has a default.
 
 ```json
 {
-  "DEV1": [
+  "healthChecks": {
+    "DEV1": [{ "app": "DEVRWDWEBWA1401", "resourceGroup": "DEVRWDWEBRG1401" }],
+    "PRD1": [{ "app": "PRDRWDWEBWA1401", "resourceGroup": "PRDRWDWEBRG1401" }]
+  },
+  "queryAlerts": [
     {
-      "targetName": "DEVRWDWEBWA1401",
-      "targetResourceGroup": "DEVRWDWEBRG1401",
-      "description": "Health check for DEVRWDWEBWA1401 dropped below 100% in the last 5 minutes",
-      "channel": "epr-alerts-platform-non-prod"
+      "name": "Synapse-PipelineRun-Failed",
+      "description": "A Synapse pipeline run failed ({env} environment)",
+      "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\"",
+      "frequency": "PT30M",
+      "environments": {
+        "DEV1": { "target": "/subscriptions/.../workspaces/DEVEPDINFLAW1401" },
+        "PRD1": { "target": "/subscriptions/.../workspaces/PRDEPDINFLAW1401", "frequency": "PT15M" }
+      }
     }
   ],
-  "TST1": [],
-  "PRE1": [],
-  "PRD1": []
+  "keyVaultRoutes": [{ "objectNamePrefixes": ["submit-data-"] }]
 }
 ```
 
-Notes:
+**`healthChecks`** is keyed by environment. Leave an environment out to deploy nothing there.
 
-- `main.bicep` already merges platform + non-platform team healthcheck files.
-- Use `epr-alerts-platform-non-prod` for non-prod environments and `epr-alerts-platform-prod` for production.
+| Field | Default |
+| --- | --- |
+| `app`, `resourceGroup` | Required. The web or function app to watch. |
+| `description` | "Health check for `<app>` dropped below 100% in the last 5 minutes" |
+| `channel` | The team's channel |
 
-## Local Validation And Deployment ✅
+**`queryAlerts`** are defined once. `environments` says where each alert is deployed, and holds the `target` (App Insights or Log Analytics resource ID) plus any field that differs in that environment.
 
-From the repository root:
+| Field | Default |
+| --- | --- |
+| `name`, `query` | Required |
+| `description` | The name. `{env}` is replaced with the environment, e.g. `DEV1`. |
+| `severity` | `3` (0 is critical, 4 is verbose) |
+| `frequency` | `PT5M`, how often the query runs |
+| `window` | Same as `frequency`, how far back the query looks |
+| `runbookUrl` | None |
+| `channel` | The team's channel |
+| `kind` | `AppInsightsQuery`. Use `AcrVulnerability` for security alerts. |
 
-- Validate:
-  - `az deployment group validate --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
+**`keyVaultRoutes`** applies to every environment. See [Route your secrets to your team's channel](#route-your-secrets-to-your-teams-channel).
 
-- What-if:
-  - `az deployment group what-if --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
+## Key Vault alerts
 
-- Deploy:
-  - `az deployment group create --mode Incremental --resource-group <rg> --template-file main.bicep --parameters params/dev1.bicepparam`
+Each environment watches one shared vault, `<ENV>RWDINFKV1401`.
 
-## CI/CD 🔄
+```mermaid
+flowchart LR
+    V[("Shared Key Vault<br/>ENV RWDINFKV1401")] --> T["Event Grid<br/>system topic"]
+    T --> E1["Expired<br/>Sev1"]
+    T --> E2["Near expiry, 30 days<br/>Sev2"]
+    T --> E3["New version<br/>Sev3"]
+    T --> E4["Boomi expired or<br/>near expiry, Sev1"]
+    E1 --> AG["Action Group"]
+    E2 --> AG
+    E3 --> AG
+    E4 --> AG
+```
 
-`pipelines/validate-and-deploy.yaml` uses template jobs in `pipelines/templates/`:
+The expired, near-expiry and new-version alerts exist for both secrets and certificates. Boomi (`boomi-*`) has its own Sev1 alerts, and the vault-wide expiry alerts skip Boomi names, so each Boomi event alerts once.
 
-- `pipelines/templates/validate-and-whatif.yaml`
-- `pipelines/templates/deploy-resources.yaml`
+### Get expiry alerts for your secrets
 
-These run validate, what-if, and create against the target resource group/environment.
+1. **Store the secret in the shared vault**, `<ENV>RWDINFKV1401`. Secrets in other vaults don't alert.
+2. **Give it an expiry date.** Without one, Key Vault never sends near-expiry or expired events. To list the secrets that have none:
+   `az keyvault secret list --vault-name <vault> --query "[?attributes.expires==null].name"`
+3. **Optional: route it to your team's channel** with `keyVaultRoutes`. Otherwise alerts go to the platform channel.
 
-Current pipeline scope:
+### Route your secrets to your team's channel
 
-- Validate jobs are enabled for DEV1 and TST1.
-- Deploy to DEV1 runs on PRs and merges/pushes to `main`.
-- Deploy to TST1 runs on merges/pushes to `main` (not PRs).
-- PRE/PRD stages are present but commented out in `pipelines/validate-and-deploy.yaml`.
+Add `keyVaultRoutes` to `data/<team>/alerts.json`:
 
-## Troubleshooting Notes 🛠️
+```json
+"keyVaultRoutes": [
+  { "objectNames": ["my-exact-secret-name"] },
+  { "objectNamePrefixes": ["submit-data-"] }
+]
+```
 
-- If what-if fails with `NoRegisteredProviderFound` for `metricalerts` and an unsupported API version (for example `2026-01-01`), check the API version in alert modules/resources and use a supported version for your target subscription/region.
-- Keep `main.bicep` as source of truth. Do not manually author compiled ARM JSON artifacts in this repo.
+- **Where alerts go:** the team's channel, unless the route sets `channel`. Routes apply in every environment.
+- **Matching:** case-insensitive. An exact name beats a prefix, and a longer prefix beats a shorter one.
+- **Scope:** routes apply to all Key Vault events for that secret: expired, near expiry and new version.
+- **Ownership:** only one team should claim each name or prefix.
+- **Real example:** the platform team's `alerts.json`, which routes `boomi-*`.
 
+### Only alert on some secrets
 
+Add a filter field to an entry in `data/platform/keyvault-event-subscriptions.json`:
+
+| Field | Alerts for |
+| --- | --- |
+| `objectNames` | Only these exact names |
+| `objectNamePrefixes` | Only names starting with one of these prefixes |
+| `excludedObjectNames` | Every name except these |
+| `excludedObjectNamePrefixes` | Every name except those starting with these prefixes |
+
+- **Names only:** matching is case-insensitive. There are no wildcards, and tags can't be used.
+- **Combining filters:** filters in one entry must all match. Use `objectNames` *or* `objectNamePrefixes` in an entry, not both.
+- **Limit:** each entry can have at most 25 values across all its filters.
+- **Duplicates:** if a secret matches two entries, it alerts twice. Exclude it from one of them, as the Boomi entries do.
+- **No environment keys:** this file isn't keyed by environment. A name that doesn't exist in a vault never matches.
+
+## Deployment
+
+```mermaid
+flowchart LR
+    PR["Pull request<br/>to main"] --> V1["Validate and what-if<br/>DEV1, TST1, PRE1, PRD1"] --> D1["Deploy DEV1"]
+
+    M["Merge to main"] --> V2["Validate and what-if<br/>all environments"]
+    V2 --> MD1["Deploy DEV1"]
+    V2 --> MT1["Deploy TST1"]
+    MD1 --> MP1["Deploy PRE1"]
+    MT1 --> MP1
+    MP1 --> MPR["Deploy PRD1"]
+```
+
+The Azure DevOps pipeline is `pipelines/validate-and-deploy.yaml`. Read the what-if output on your PR before merging; it shows exactly what will change.
+
+| Env | Resource group | Key Vault | Service connection | Default channel |
+| --- | --- | --- | --- | --- |
+| DEV1 | `DEVRWDINFRG1401` | `DEVRWDINFKV1401` | `AZD-RWD-DEV1-Alerts` | `epr-alerts-platform-non-prod` |
+| TST1 | `TSTRWDINFRG1401` | `TSTRWDINFKV1401` | `AZD-RWD-TST1-Alerts` | `epr-alerts-platform-non-prod` |
+| PRE1 | `PRERWDINFRG1401` | `PRERWDINFKV1401` | `AZR-RWD-PRE1-Alerts` | `epr-alerts-platform-non-prod` |
+| PRD1 | `PRDRWDINFRG1401` | `PRDRWDINFKV1401` | `AZR-RWD-PRD1-Alerts` | `epr-alerts-platform-prod` |
+
+### Run it yourself
+
+```bash
+RG=DEVRWDINFRG1401; PARAMS=params/dev1.bicepparam
+az deployment group validate --resource-group $RG --template-file main.bicep --parameters $PARAMS
+az deployment group what-if  --resource-group $RG --template-file main.bicep --parameters $PARAMS
+az deployment group create   --resource-group $RG --template-file main.bicep --parameters $PARAMS
+```
+
+## Adding a new kind of alert
+
+If no existing JSON file fits:
+
+1. Add a module under `modules/` that takes an action group ID.
+2. Call it from `main.bicep` with `genericActionGroup.outputs.actionGroupId`.
+3. If teams should configure it, add a new section to `alerts.json` and read it in `teamConfigs` in `main.bicep`.
+
+## Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `main.bicep` | Entry point. Reads `data/` and deploys everything. |
+| `params/<env>.bicepparam` | Per-environment settings: Key Vault, Slack channels, default channel. |
+| `data/<team>/alerts.json` | Each team's alerts. |
+| `modules/logicApp/` | Processor, router and channel Logic Apps. |
+| `modules/actionGroup/`, `modules/metricAlert/`, `modules/*.bicep` | Action Group, alert rules and Event Grid resources. |
+| `pipelines/` | Azure DevOps validate and deploy pipeline. |
+| `docs/` | LikeC4 architecture model, published to GitHub Pages. |
+
+## Troubleshooting
+
+- **Alert went to the platform channel instead of mine:** the channel isn't in that environment's `channelInterfaces`, or, for Key Vault alerts, no route matched the secret name.
+- **No near-expiry alert for a secret:** the secret has no expiry date, or it isn't in the shared vault.
+- **What-if fails with `NoRegisteredProviderFound`:** the module uses an API version that isn't available in that region. Use a supported one.
+- **Don't add compiled ARM JSON.** `main.bicep` is the source of truth.
