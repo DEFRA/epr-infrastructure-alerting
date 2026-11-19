@@ -1,0 +1,29 @@
+{
+  "healthChecks": {},
+  "queryAlerts": [
+    {
+      "name": "AppInsights-Synapse-PipelineRun-Failed",
+      "description": "A Synapse integration pipeline run failed in the last 30 minutes ({env} environment)",
+      "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\" | summarize arg_max(TimeGenerated, *) by RunId | extend WorkspaceName = tostring(split(_ResourceId, \"/\")[8]) | project FailureTimestamp = coalesce(End, TimeGenerated), PipelineName, RunId, WorkspaceName, _ResourceId",
+      "frequency": "PT30M",
+      "window": "PT30M",
+      "environments": {
+        "DEV1": {
+          "target": "/subscriptions/4dc3cd05-36fc-4662-a4ca-88d65a346894/resourceGroups/DEVEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/DEVEPDINFLAW1401"
+        },
+        "TST1": {
+          "target": "/subscriptions/a3d66c10-9ea5-4d60-adc4-211310f5ea53/resourceGroups/TSTEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/TSTEPDINFLAW1401"
+        },
+        "PRE1": {
+          "target": "/subscriptions/3e221459-e830-4994-9d4d-38c14677cbe8/resourceGroups/PREEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/PREEPDINFLAW1401"
+        },
+        "PRD1": {
+          "frequency": "PT15M",
+          "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6631751967/Synapse+pipeline+run+failed+in+production+PRD1+-+runbook",
+          "target": "/subscriptions/485cd0f0-3b4c-4e1e-9899-d6c9c1f90367/resourceGroups/PRDEPDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/PRDEPDINFLAW1401"
+        }
+      }
+    }
+  ],
+  "keyVaultRoutes": []
+}

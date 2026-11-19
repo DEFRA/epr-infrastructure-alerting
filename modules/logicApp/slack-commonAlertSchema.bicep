@@ -1,3 +1,5 @@
+@description('Channel used when neither the alert rule nor a Key Vault route names one')
+param defaultChannel string
 @description('Key Vault object routes: [{ match: exact|prefix, value: lower-case name, channel }], most specific first')
 param keyVaultSecretRoutes array = []
 param location string
@@ -16,6 +18,9 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
       '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
       contentVersion: '1.0.0.0'
       parameters: {
+        defaultChannel: {
+          type: 'String'
+        }
         keyVaultSecretRoutes: {
           type: 'Array'
           defaultValue: []
@@ -142,10 +147,10 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
             Filter_KeyVault_Secret_Routes: [ 'Succeeded' ]
           }
         }
-        // Precedence: alert rule customProperties.channel, then Key Vault object route, then platform default
+        // Precedence: alert rule customProperties.channel, then Key Vault object route, then the environment default
         Get_Routing_Channel: {
           type: 'Compose'
-          inputs: '@{if(not(empty(outputs(\'Get_Channel\'))), toLower(outputs(\'Get_Channel\')), if(not(empty(outputs(\'Get_KeyVault_Route_Channel\'))), toLower(outputs(\'Get_KeyVault_Route_Channel\')), \'epr-alerts-platform-non-prod\'))}'
+          inputs: '@{if(not(empty(outputs(\'Get_Channel\'))), toLower(outputs(\'Get_Channel\')), if(not(empty(outputs(\'Get_KeyVault_Route_Channel\'))), toLower(outputs(\'Get_KeyVault_Route_Channel\')), toLower(parameters(\'defaultChannel\'))))}'
           runAfter: {
             Get_Channel: [ 'Succeeded' ]
             Get_KeyVault_Route_Channel: [ 'Succeeded' ]
@@ -395,6 +400,9 @@ resource genericWorkflow 'Microsoft.Logic/workflows@2019-05-01' = {
       outputs: {}
     }
     parameters: {
+      defaultChannel: {
+        value: defaultChannel
+      }
       keyVaultSecretRoutes: {
         value: keyVaultSecretRoutes
       }

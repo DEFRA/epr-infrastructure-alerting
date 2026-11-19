@@ -1,0 +1,87 @@
+{
+  "healthChecks": {
+    "DEV1": [
+      {
+        "app": "DEVRWDWEBWA1401",
+        "resourceGroup": "DEVRWDWEBRG1401"
+      },
+      {
+        "app": "DEVRWDWEBFA1401",
+        "resourceGroup": "DEVRWDWEBRG1401"
+      }
+    ],
+    "TST1": [
+      {
+        "app": "TSTRWDWEBWA1401",
+        "resourceGroup": "TSTRWDWEBRG1401"
+      }
+    ],
+    "PRD1": [
+      {
+        "app": "PRDRWDWEBWA1401",
+        "resourceGroup": "PRDRWDWEBRG1401"
+      },
+      {
+        "app": "PRDRWDWEBFA1401",
+        "resourceGroup": "PRDRWDWEBRG1401"
+      }
+    ]
+  },
+  "queryAlerts": [
+    {
+      "name": "AppInsights-AntiVirus-FileUploaded",
+      "description": "A file was uploaded to blob storage for antivirus scanning ({env} environment)",
+      "query": "traces | where message contains 'File Uploaded to blob storage'",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6447759417/DEFRA+Trade+Anti+Virus+API+-+secret+renewal",
+      "environments": {
+        "DEV1": {
+          "target": "/subscriptions/8f549c59-2438-4495-b571-705081e497e4/resourceGroups/DEVRWDINFRG1401/providers/Microsoft.Insights/components/DEVRWDINFAI1401"
+        },
+        "TST1": {
+          "target": "/subscriptions/5ac20727-8367-4439-81c1-1ba4c030ecb0/resourceGroups/TSTRWDINFRG1401/providers/Microsoft.Insights/components/TSTRWDINFAI1401"
+        },
+        "PRE1": {
+          "target": "/subscriptions/3e221459-e830-4994-9d4d-38c14677cbe8/resourceGroups/PRERWDINFRG1401/providers/Microsoft.Insights/components/PRERWDINFAI1401"
+        },
+        "PRD1": {
+          "target": "/subscriptions/485cd0f0-3b4c-4e1e-9899-d6c9c1f90367/resourceGroups/PRDRWDINFRG1401/providers/Microsoft.Insights/components/PRDRWDINFAI1401"
+        }
+      }
+    },
+    {
+      "name": "ACRVulnerabilities-Critical",
+      "kind": "AcrVulnerability",
+      "description": "Alerts when Defender for Cloud data indicates unresolved Critical ACR image vulnerabilities.",
+      "query": "SecurityRecommendation | where TimeGenerated > ago(60m) | where RecommendationState =~ 'Unhealthy' | where RecommendationSeverity =~ 'Critical' | where AssessedResourceId has '/providers/Microsoft.ContainerRegistry/registries/' | summarize VulnerabilityFindings = count() by AssessedResourceId",
+      "severity": 0,
+      "frequency": "P1D",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6238076953/Environment+Rationalisation",
+      "environments": {
+        "DEV1": {
+          "target": "/subscriptions/8f549c59-2438-4495-b571-705081e497e4/resourceGroups/DEVRWDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/DEVRWDINFLA1401"
+        }
+      }
+    },
+    {
+      "name": "ACRVulnerabilities-High",
+      "kind": "AcrVulnerability",
+      "description": "Alerts when Defender for Cloud data indicates unresolved High ACR image vulnerabilities.",
+      "query": "SecurityRecommendation | where TimeGenerated > ago(60m) | where RecommendationState =~ 'Unhealthy' | where RecommendationSeverity =~ 'High' | where AssessedResourceId has '/providers/Microsoft.ContainerRegistry/registries/' | summarize VulnerabilityFindings = count() by AssessedResourceId",
+      "severity": 1,
+      "frequency": "P1D",
+      "runbookUrl": "https://eaflood.atlassian.net/wiki/spaces/EDIA/pages/6238076953/Environment+Rationalisation",
+      "environments": {
+        "DEV1": {
+          "target": "/subscriptions/8f549c59-2438-4495-b571-705081e497e4/resourceGroups/DEVRWDINFRG1401/providers/Microsoft.OperationalInsights/workspaces/DEVRWDINFLA1401"
+        }
+      }
+    }
+  ],
+  "keyVaultRoutes": [
+    {
+      "objectNamePrefixes": [
+        "boomi-"
+      ]
+    }
+  ]
+}

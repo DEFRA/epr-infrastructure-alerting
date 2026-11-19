@@ -32,58 +32,82 @@ flowchart LR
 
 ## Which channel does an alert go to?
 
+Each team's alerts go to that team's channel: `epr-alerts-<team>-prod` in PRD and `epr-alerts-<team>-non-prod` everywhere else. An alert can set `channel` to override this.
+
 ```mermaid
 flowchart TD
-    A["Alert arrives"] --> B{"Alert rule has a<br/>'channel' property?"}
-    B -- Yes --> T["That channel"]
-    B -- No --> D{"Key Vault alert and the<br/>secret name matches a route?"}
-    D -- Yes --> TR["Team channel<br/>from keyvault-secret-routes.json"]
-    D -- No --> PL["Platform channel"]
+    A["Alert arrives"] --> B{"Health check or<br/>query alert?"}
+    B -- Yes --> T["Its team's channel,<br/>or its 'channel' override"]
+    B -- "No: Key Vault alert" --> D{"Secret name matches a<br/>team's keyVaultRoutes?"}
+    D -- Yes --> TR["That team's channel"]
+    D -- No --> PL["Environment default channel<br/>(platform)"]
 ```
 
-If the chosen channel isn't deployed in that environment, the router uses the environment's default channel (`channelInterfaceDefault`).
+If the channel isn't deployed in that environment (`channelInterfaces` in `params/<env>.bicepparam`), the alert goes to the environment default instead.
 
 ## Which file do I edit?
 
+Each team has one file: `data/<team>/alerts.json`. `<team>` is one of `manage-account`, `manage-liabilities`, `meet-obligations`, `platform`, `regulator-tooling` or `submit-data`.
+
 | I want to... | Edit |
 | --- | --- |
-| Alert when a web or function app's health check fails | `data/<team>/healthcheck-targets.json` |
-| Alert on an App Insights or Log Analytics query | `data/<team>/appinsights-query-rules.json` |
-| Alert on ACR vulnerabilities | `data/platform/acr-vulnerability-query-rules.json` |
+| Alert when a web or function app's health check fails | `healthChecks` in `data/<team>/alerts.json` |
+| Alert on an App Insights or Log Analytics query | `queryAlerts` in `data/<team>/alerts.json` |
+| Send alerts for my team's Key Vault secrets to my team's channel | `keyVaultRoutes` in `data/<team>/alerts.json` |
 | Get expiry alerts for a secret or certificate | Nothing. See [Key Vault alerts](#key-vault-alerts). |
-| Send my team's Key Vault alerts to my team's channel | `data/<team>/keyvault-secret-routes.json` |
 | Change which Key Vault events alert, or their severity | `data/platform/keyvault-event-subscriptions.json` |
+| Add a team | Add a folder with an `alerts.json`, and one line to `teamFiles` in `main.bicep` |
 | Add a Slack channel to an environment | `params/<env>.bicepparam` (`channelInterfaces`), plus a `slack-webhook-<channel>` secret in that environment's vault |
 | Change the Slack message format or routing logic | `modules/logicApp/slack-commonAlertSchema.bicep` |
 
-`<team>` is one of `manage-account`, `manage-liabilities`, `meet-obligations`, `platform`, `regulator-tooling` or `submit-data`.
+### alerts.json
 
-Rules for every file in `data/<team>/`:
-
-- It's keyed by environment (`DEV1`, `TST1`, `PRE1`, `PRD1`). Leave out an environment, or use `[]`, to deploy nothing there.
-- Use `-non-prod` channels for DEV, TST and PRE, and `-prod` channels for PRD.
-
-### Example: add a health check alert
-
-In `data/<team>/healthcheck-targets.json`:
+Only `app`, `resourceGroup`, `name`, `query` and `target` are required. Everything else has a default.
 
 ```json
 {
-  "DEV1": [
+  "healthChecks": {
+    "DEV1": [{ "app": "DEVRWDWEBWA1401", "resourceGroup": "DEVRWDWEBRG1401" }],
+    "PRD1": [{ "app": "PRDRWDWEBWA1401", "resourceGroup": "PRDRWDWEBRG1401" }]
+  },
+  "queryAlerts": [
     {
-      "targetName": "DEVRWDWEBWA1401",
-      "targetResourceGroup": "DEVRWDWEBRG1401",
-      "description": "Health check for DEVRWDWEBWA1401 dropped below 100% in the last 5 minutes",
-      "channel": "epr-alerts-platform-non-prod"
+      "name": "Synapse-PipelineRun-Failed",
+      "description": "A Synapse pipeline run failed ({env} environment)",
+      "query": "SynapseIntegrationPipelineRuns | where Status =~ \"Failed\"",
+      "frequency": "PT30M",
+      "environments": {
+        "DEV1": { "target": "/subscriptions/.../workspaces/DEVEPDINFLAW1401" },
+        "PRD1": { "target": "/subscriptions/.../workspaces/PRDEPDINFLAW1401", "frequency": "PT15M" }
+      }
     }
   ],
-  "TST1": [],
-  "PRE1": [],
-  "PRD1": []
+  "keyVaultRoutes": [{ "objectNamePrefixes": ["submit-data-"] }]
 }
 ```
 
-Copy an existing entry for the other alert types. `main.bicep` reads all the team files and connects every alert to the Action Group, so no Bicep changes are needed.
+**`healthChecks`** is keyed by environment. Leave an environment out to deploy nothing there.
+
+| Field | Default |
+| --- | --- |
+| `app`, `resourceGroup` | Required. The web or function app to watch. |
+| `description` | "Health check for `<app>` dropped below 100% in the last 5 minutes" |
+| `channel` | The team's channel |
+
+**`queryAlerts`** are defined once. `environments` says where each alert is deployed, and holds the `target` (App Insights or Log Analytics resource ID) plus any field that differs in that environment.
+
+| Field | Default |
+| --- | --- |
+| `name`, `query` | Required |
+| `description` | The name. `{env}` is replaced with the environment, e.g. `DEV1`. |
+| `severity` | `3` (0 is critical, 4 is verbose) |
+| `frequency` | `PT5M`, how often the query runs |
+| `window` | Same as `frequency`, how far back the query looks |
+| `runbookUrl` | None |
+| `channel` | The team's channel |
+| `kind` | `AppInsightsQuery`. Use `AcrVulnerability` for security alerts. |
+
+**`keyVaultRoutes`** applies to every environment. See [Route your secrets to your team's channel](#route-your-secrets-to-your-teams-channel).
 
 ## Key Vault alerts
 
@@ -109,33 +133,24 @@ The expired, near-expiry and new-version alerts exist for both secrets and certi
 1. **Store the secret in the shared vault**, `<ENV>RWDINFKV1401`. Secrets in other vaults don't alert.
 2. **Give it an expiry date.** Without one, Key Vault never sends near-expiry or expired events. To list the secrets that have none:
    `az keyvault secret list --vault-name <vault> --query "[?attributes.expires==null].name"`
-3. **Optional: route it to your team's channel.** Otherwise alerts go to the platform channel.
+3. **Optional: route it to your team's channel** with `keyVaultRoutes`. Otherwise alerts go to the platform channel.
 
 ### Route your secrets to your team's channel
 
-In `data/<team>/keyvault-secret-routes.json`:
+Add `keyVaultRoutes` to `data/<team>/alerts.json`:
 
 ```json
-{
-  "DEV1": [
-    {
-      "channel": "epr-alerts-submit-data-non-prod",
-      "objectNames": ["my-exact-secret-name"],
-      "objectNamePrefixes": ["submit-data-"]
-    }
-  ],
-  "TST1": [],
-  "PRE1": [],
-  "PRD1": [
-    { "channel": "epr-alerts-submit-data-prod", "objectNamePrefixes": ["submit-data-"] }
-  ]
-}
+"keyVaultRoutes": [
+  { "objectNames": ["my-exact-secret-name"] },
+  { "objectNamePrefixes": ["submit-data-"] }
+]
 ```
 
+- **Where alerts go:** the team's channel, unless the route sets `channel`. Routes apply in every environment.
 - **Matching:** case-insensitive. An exact name beats a prefix, and a longer prefix beats a shorter one.
 - **Scope:** routes apply to all Key Vault events for that secret: expired, near expiry and new version.
 - **Ownership:** only one team should claim each name or prefix.
-- **Real example:** `data/platform/keyvault-secret-routes.json`, which sends `boomi-*` to the platform channel.
+- **Real example:** the platform team's `alerts.json`, which routes `boomi-*`.
 
 ### Only alert on some secrets
 
@@ -192,7 +207,7 @@ If no existing JSON file fits:
 
 1. Add a module under `modules/` that takes an action group ID.
 2. Call it from `main.bicep` with `genericActionGroup.outputs.actionGroupId`.
-3. If you want several instances, add a JSON data file and loop over it in `main.bicep`.
+3. If teams should configure it, add a new section to `alerts.json` and read it in `teamConfigs` in `main.bicep`.
 
 ## Repository layout
 
@@ -200,7 +215,7 @@ If no existing JSON file fits:
 | --- | --- |
 | `main.bicep` | Entry point. Reads `data/` and deploys everything. |
 | `params/<env>.bicepparam` | Per-environment settings: Key Vault, Slack channels, default channel. |
-| `data/<team>/` | Alert definitions, keyed by environment. |
+| `data/<team>/alerts.json` | Each team's alerts. |
 | `modules/logicApp/` | Processor, router and channel Logic Apps. |
 | `modules/actionGroup/`, `modules/metricAlert/`, `modules/*.bicep` | Action Group, alert rules and Event Grid resources. |
 | `pipelines/` | Azure DevOps validate and deploy pipeline. |
@@ -208,7 +223,7 @@ If no existing JSON file fits:
 
 ## Troubleshooting
 
-- **Alert went to the platform channel instead of mine:** the channel name isn't in that environment's `channelInterfaces`, or no route matched the secret name.
+- **Alert went to the platform channel instead of mine:** the channel isn't in that environment's `channelInterfaces`, or, for Key Vault alerts, no route matched the secret name.
 - **No near-expiry alert for a secret:** the secret has no expiry date, or it isn't in the shared vault.
 - **What-if fails with `NoRegisteredProviderFound`:** the module uses an API version that isn't available in that region. Use a supported one.
 - **Don't add compiled ARM JSON.** `main.bicep` is the source of truth.
