@@ -1,5 +1,11 @@
 {
   "healthChecks": {},
   "queryAlerts": [],
-  "keyVaultRoutes": []
+  "keyVaultRoutes": [
+    {
+      "objectNamePrefixes": [
+        "boomi-"
+      ]
+    }
+  ]
 }

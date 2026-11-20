@@ -150,7 +150,7 @@ Add `keyVaultRoutes` to `data/<team>/alerts.json`:
 - **Matching:** case-insensitive. An exact name beats a prefix, and a longer prefix beats a shorter one.
 - **Scope:** routes apply to all Key Vault events for that secret: expired, near expiry and new version.
 - **Ownership:** only one team should claim each name or prefix.
-- **Real example:** the platform team's `alerts.json`, which routes `boomi-*`.
+- **Real example:** the manage-account team's `alerts.json`, which routes `boomi-*`.
 
 ### Only alert on some secrets
 
